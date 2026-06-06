@@ -1,13 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { CheckCircle } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import { getApiKey, saveApiKey } from "@/lib/ai-curator";
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    const key = getApiKey();
+    if (key) setApiKey(key);
+  }, []);
+
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    // Secure storage implementation in U7
+    saveApiKey(apiKey.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -26,7 +33,8 @@ export default function SettingsPage() {
             AI Curation (Anthropic Claude)
           </h2>
           <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
-            Provide your own Anthropic API key to enable AI-powered content curation. Your key is stored encrypted on your device.
+            Provide your Anthropic API key to enable AI-powered content curation from notes and journal entries.
+            Your key is stored locally on your device only.
           </p>
           <form onSubmit={handleSave} className="space-y-3">
             <div>
@@ -39,19 +47,16 @@ export default function SettingsPage() {
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-ant-…"
                 className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
-                style={{
-                  background: "var(--color-surface)",
-                  borderColor: "var(--color-border)",
-                  color: "var(--color-text)",
-                }}
+                style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
               />
             </div>
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg text-sm text-white font-medium"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium"
                 style={{ background: "var(--color-primary)" }}
               >
+                {saved && <CheckCircle size={14} />}
                 {saved ? "Saved!" : "Save API Key"}
               </button>
               <a
@@ -76,11 +81,11 @@ export default function SettingsPage() {
             Sync to LifeScribe.us
           </h2>
           <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
-            Optionally connect your account to publish your biography to the web. Sync implementation in U9.
+            Optionally connect your account to publish your biography to the web.
           </p>
           <button
             disabled
-            className="px-4 py-2 rounded-lg text-sm text-white font-medium opacity-50"
+            className="px-4 py-2 rounded-lg text-sm text-white font-medium opacity-50 cursor-not-allowed"
             style={{ background: "var(--color-primary)" }}
           >
             Connect Account
