@@ -2,15 +2,19 @@ import Database from "@tauri-apps/plugin-sql";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 let _db: Database | null = null;
+let _dbPromise: Promise<Database> | null = null;
 
 const MIGRATIONS_PATH = "sqlite:lifescribe.db";
 
 export async function getDb(): Promise<Database> {
-  if (!_db) {
-    _db = await Database.load(MIGRATIONS_PATH);
-    await runMigrations(_db);
-  }
-  return _db;
+  if (_db) return _db;
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = Database.load(MIGRATIONS_PATH).then(async (db) => {
+    await runMigrations(db);
+    _db = db;
+    return db;
+  });
+  return _dbPromise;
 }
 
 // Run SQL migrations from the migrations directory.
@@ -42,7 +46,7 @@ async function runMigrations(db: Database): Promise<void> {
       for (const stmt of statements) {
         await db.execute(stmt);
       }
-      await db.execute("INSERT INTO _migrations (name) VALUES (?)", [name]);
+      await db.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", [name]);
     }
   }
 }
