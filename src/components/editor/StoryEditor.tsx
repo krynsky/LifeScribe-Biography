@@ -1,5 +1,5 @@
-import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useCallback, useRef } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -103,6 +103,18 @@ export default function StoryEditor({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  const [counts, setCounts] = useState({ chars: 0, words: 0 });
+
+  function extractCounts(ed: Editor | null) {
+    if (!ed) return;
+    const storage = ed.storage.characterCount as
+      | { characters: () => number; words: () => number }
+      | undefined;
+    if (storage) {
+      setCounts({ chars: storage.characters(), words: storage.words() });
+    }
+  }
+
   const editor = useEditor({
     extensions: [
       ...EXTENSIONS,
@@ -110,8 +122,12 @@ export default function StoryEditor({
     ],
     content: content ? (JSON.parse(content) as object) : null,
     editable: !readOnly,
+    onCreate({ editor }) {
+      extractCounts(editor);
+    },
     onUpdate({ editor }) {
       onChangeRef.current(JSON.stringify(editor.getJSON()));
+      extractCounts(editor);
     },
   });
 
@@ -121,8 +137,9 @@ export default function StoryEditor({
     const current = JSON.stringify(editor.getJSON());
     if (current !== content) {
       editor.commands.setContent(JSON.parse(content) as object, false);
+      extractCounts(editor);
     }
-  }, [content, editor]);
+  }, [content, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleImageInsert = useCallback(async () => {
     if (!editor) return;
@@ -142,9 +159,6 @@ export default function StoryEditor({
 
   if (!editor) return null;
 
-  const charCount = (editor.storage as { characterCount?: { characters?: () => number; words?: () => number } }).characterCount?.characters?.() ?? 0;
-  const wordCount = (editor.storage as { characterCount?: { characters?: () => number; words?: () => number } }).characterCount?.words?.() ?? 0;
-
   return (
     <div
       className="flex flex-col rounded-xl border overflow-hidden"
@@ -162,8 +176,8 @@ export default function StoryEditor({
         className="flex items-center gap-4 px-6 py-2 border-t text-xs"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
       >
-        <span>{wordCount} words</span>
-        <span>{charCount} characters</span>
+        <span>{counts.words} words</span>
+        <span>{counts.chars} characters</span>
       </div>
     </div>
   );
