@@ -1,5 +1,5 @@
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import { useEffect, useCallback, useRef, useState } from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import { useEffect, useCallback, useRef } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -103,18 +103,6 @@ export default function StoryEditor({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const [counts, setCounts] = useState({ chars: 0, words: 0 });
-
-  function extractCounts(ed: Editor | null) {
-    if (!ed) return;
-    const storage = ed.storage.characterCount as
-      | { characters: () => number; words: () => number }
-      | undefined;
-    if (storage) {
-      setCounts({ chars: storage.characters(), words: storage.words() });
-    }
-  }
-
   const editor = useEditor({
     extensions: [
       ...EXTENSIONS,
@@ -122,12 +110,8 @@ export default function StoryEditor({
     ],
     content: content ? (JSON.parse(content) as object) : null,
     editable: !readOnly,
-    onCreate({ editor }) {
-      extractCounts(editor);
-    },
     onUpdate({ editor }) {
       onChangeRef.current(JSON.stringify(editor.getJSON()));
-      extractCounts(editor);
     },
   });
 
@@ -137,9 +121,17 @@ export default function StoryEditor({
     const current = JSON.stringify(editor.getJSON());
     if (current !== content) {
       editor.commands.setContent(JSON.parse(content) as object, false);
-      extractCounts(editor);
     }
   }, [content, editor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tiptap 2.27: useEditor triggers a re-render on every transaction via
+  // useSyncExternalStore, so reading storage directly here always reflects
+  // the current document state — no separate useState needed.
+  const charCountStorage = editor?.storage.characterCount as
+    | { characters: () => number; words: () => number }
+    | undefined;
+  const wordCount = charCountStorage?.words() ?? 0;
+  const charCount = charCountStorage?.characters() ?? 0;
 
   const handleImageInsert = useCallback(async () => {
     if (!editor) return;
@@ -176,8 +168,8 @@ export default function StoryEditor({
         className="flex items-center gap-4 px-6 py-2 border-t text-xs"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
       >
-        <span>{counts.words} words</span>
-        <span>{counts.chars} characters</span>
+        <span>{wordCount} words</span>
+        <span>{charCount} characters</span>
       </div>
     </div>
   );
