@@ -58,10 +58,12 @@ export default function MapView({ pins, onPinClick, onMapClick, height = "500px"
         marker.on("click", () => onPinClickRef.current?.(pin));
       });
 
-      // Fit bounds if we have pins
-      if (pins.length > 0) {
+      // Fit bounds if we have pins; cap zoom so a single pin doesn't fill the screen
+      if (pins.length === 1) {
+        map.setView([pins[0].latitude, pins[0].longitude], 8);
+      } else if (pins.length > 1) {
         const bounds = L.latLngBounds(pins.map((p) => [p.latitude, p.longitude]));
-        map.fitBounds(bounds, { padding: [40, 40] });
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 });
       }
     });
 
