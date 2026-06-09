@@ -24,7 +24,10 @@
     "shell:default",
     "shell:allow-open",
     "http:default",
-    "http:allow-fetch",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [{ "url": "https://lifescribe.us/**" }]
+    },
     "sql:default",
     "sql:allow-execute",
     "sql:allow-select",
