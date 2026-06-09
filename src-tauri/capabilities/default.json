@@ -23,6 +23,8 @@
     "fs:write-all",
     "shell:default",
     "shell:allow-open",
+    "http:default",
+    "http:allow-fetch",
     "sql:default",
     "sql:allow-execute",
     "sql:allow-select",

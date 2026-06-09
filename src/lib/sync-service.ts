@@ -4,6 +4,7 @@
 // stored in localStorage (no OAuth redirect needed for a desktop app).
 
 import { readFile } from "@tauri-apps/plugin-fs";
+import { fetch } from "@tauri-apps/plugin-http";
 import { query, execute } from "./db";
 import type { Album, Biography, CareerEntry, FamilyMember, MapPin, Milestone, Story } from "./models";
 
