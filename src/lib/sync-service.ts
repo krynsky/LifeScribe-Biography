@@ -71,6 +71,7 @@ export interface RemoteProfile {
   id: string;
   email: string;
   display_name: string;
+  site: { id: string; slug: string; title: string };
 }
 
 export async function testConnection(): Promise<RemoteProfile> {
@@ -110,6 +111,8 @@ import { query } from "./db";
 
 export interface FullSyncResult {
   pushed: number;
+  pulled: number;
+  conflicts: string[];
   errors: string[];
 }
 
@@ -141,7 +144,7 @@ export async function syncToRemote(onProgress?: (msg: string) => void): Promise<
   try {
     const result = await pushToRemote(payload);
     onProgress?.(`Sync complete — ${result.pushed} items updated`);
-    return { pushed: result.pushed, errors: result.conflicts };
+    return { pushed: result.pushed, pulled: 0, conflicts: result.conflicts, errors: [] };
   } catch (err) {
     throw err;
   }
