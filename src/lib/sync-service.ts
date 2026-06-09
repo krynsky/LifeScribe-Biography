@@ -3,6 +3,10 @@
 // remote lifescribe.us REST API. Auth uses a long-lived personal access token
 // stored in localStorage (no OAuth redirect needed for a desktop app).
 
+import { readFile } from "@tauri-apps/plugin-fs";
+import { query, execute } from "./db";
+import type { Album, Biography, CareerEntry, FamilyMember, MapPin, Milestone, Story } from "./models";
+
 const STORAGE_KEY_TOKEN = "lifescribe_sync_token";
 const STORAGE_KEY_URL = "lifescribe_sync_url";
 const STORAGE_KEY_LAST_PULL = "lifescribe_last_pull_at";
@@ -388,10 +392,6 @@ async function mergePullResult(data: SyncPayload): Promise<number> {
 
 // ── Sync orchestration (local DB → remote) ────────────────────────────────
 
-import { readFile } from "@tauri-apps/plugin-fs";
-import { query, execute } from "./db";
-import type { Album, Biography, CareerEntry, FamilyMember, MapPin, Milestone, Story } from "./models";
-
 export interface FullSyncResult {
   pushed: number;
   pulled: number;
@@ -425,6 +425,7 @@ export async function syncToRemote(onProgress?: (msg: string) => void): Promise<
     albums: albums.map((a) => toApiRecord(a as unknown as Record<string, unknown>)),
   };
 
+  const syncStartedAt = new Date().toISOString();
   onProgress?.("Pushing to LifeScribe.us…");
   const pushResult = await pushToRemote(payload);
 
@@ -440,7 +441,6 @@ export async function syncToRemote(onProgress?: (msg: string) => void): Promise<
   await persistPushResults(pushResult, batches, !!bio);
 
   onProgress?.("Pulling web changes…");
-  const syncStartedAt = new Date().toISOString();
   const since = localStorage.getItem(STORAGE_KEY_LAST_PULL) ?? undefined;
   let pulled = 0;
   try {
