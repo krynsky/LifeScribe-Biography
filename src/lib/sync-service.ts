@@ -113,6 +113,51 @@ function toApiRecord(record: Record<string, unknown>): Record<string, unknown> {
   return { ...rest, last_synced_at: (synced_at as string | null) ?? null };
 }
 
+interface EntityBatch {
+  table: string;
+  typeKey: string;
+  ids: number[];
+}
+
+async function persistPushResults(
+  result: SyncResult,
+  batches: EntityBatch[],
+  biographyWasPushed: boolean
+): Promise<void> {
+  const conflictSet = new Set(result.conflicts);
+
+  for (const { table, typeKey, ids } of batches) {
+    for (const id of ids) {
+      const baseKey = `${typeKey}:${id}`;
+      // Skip if any conflict key starts with this base key
+      // (e.g. "stories:5:stale" starts with "stories:5")
+      if ([...conflictSet].some((c) => c.startsWith(baseKey))) continue;
+
+      const remoteId = result.remote_id_map[baseKey];
+      if (remoteId) {
+        // Newly linked — write remote CUID and mark synced
+        await execute(
+          `UPDATE ${table} SET remote_id = ?, synced_at = datetime('now') WHERE id = ?`,
+          [remoteId, id]
+        );
+      } else {
+        // Previously linked — just mark synced
+        await execute(
+          `UPDATE ${table} SET synced_at = datetime('now') WHERE id = ?`,
+          [id]
+        );
+      }
+    }
+  }
+
+  if (biographyWasPushed) {
+    await execute(
+      `UPDATE biography SET synced_at = datetime('now') WHERE id = 1`,
+      []
+    );
+  }
+}
+
 // ── Sync orchestration (local DB → remote) ────────────────────────────────
 
 import { readFile } from "@tauri-apps/plugin-fs";
