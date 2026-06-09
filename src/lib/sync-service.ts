@@ -5,6 +5,7 @@
 
 const STORAGE_KEY_TOKEN = "lifescribe_sync_token";
 const STORAGE_KEY_URL = "lifescribe_sync_url";
+const STORAGE_KEY_LAST_PULL = "lifescribe_last_pull_at";
 const DEFAULT_API_URL = "https://lifescribe.us/api/v1";
 
 // ── Auth ──────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ export function saveSyncCredentials(token: string, url?: string): void {
 export function clearSyncCredentials(): void {
   localStorage.removeItem(STORAGE_KEY_TOKEN);
   localStorage.removeItem(STORAGE_KEY_URL);
+  localStorage.removeItem(STORAGE_KEY_LAST_PULL);
 }
 
 export function isSyncConfigured(): boolean {
@@ -105,9 +107,17 @@ export async function pullFromRemote(since?: string): Promise<SyncPayload> {
   return apiRequest<SyncPayload>("GET", `/sync/pull${qs}`);
 }
 
+// Renames synced_at → last_synced_at for the push API contract.
+function toApiRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const { synced_at, ...rest } = record;
+  return { ...rest, last_synced_at: (synced_at as string | null) ?? null };
+}
+
 // ── Sync orchestration (local DB → remote) ────────────────────────────────
 
-import { query } from "./db";
+import { readFile } from "@tauri-apps/plugin-fs";
+import { query, execute } from "./db";
+import type { Album, Biography, CareerEntry, FamilyMember, MapPin, Milestone, Story } from "./models";
 
 export interface FullSyncResult {
   pushed: number;
