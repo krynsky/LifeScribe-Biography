@@ -164,9 +164,7 @@ async function persistPushResults(
   for (const { table, typeKey, ids } of batches) {
     for (const id of ids) {
       const baseKey = `${typeKey}:${id}`;
-      // Skip if any conflict key starts with this base key
-      // (e.g. "stories:5:stale" starts with "stories:5")
-      if ([...conflictSet].some((c) => c.startsWith(baseKey))) continue;
+      if ([...conflictSet].some((c) => c.startsWith(baseKey + ":"))) continue;
 
       const remoteId = result.remote_id_map[baseKey];
       if (remoteId) {
