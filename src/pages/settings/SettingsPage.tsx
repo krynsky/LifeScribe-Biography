@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
-  const [syncDone, setSyncDone] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ pushed: number; pulled: number; conflicts: string[] } | null>(null);
 
   useEffect(() => {
     setApiKey(getApiKey());
@@ -67,11 +67,15 @@ export default function SettingsPage() {
 
   async function handleSync() {
     setSyncing(true);
-    setSyncDone(false);
+    setSyncResult(null);
     setSyncStatus("");
     try {
-      await syncToRemote((msg) => setSyncStatus(msg));
-      setSyncDone(true);
+      const result = await syncToRemote((msg) => setSyncStatus(msg));
+      setSyncResult(result);
+      const conflictNote = result.conflicts.length > 0
+        ? ` · ${result.conflicts.length} conflict${result.conflicts.length > 1 ? "s" : ""} — resolve at lifescribe.us`
+        : "";
+      setSyncStatus(`Sync complete — ${result.pushed} pushed, ${result.pulled} pulled${conflictNote}`);
     } catch (err) {
       setSyncStatus("Sync failed: " + String(err));
     } finally {
@@ -145,11 +149,20 @@ export default function SettingsPage() {
                 style={{ background: "var(--color-primary)" + "10", borderColor: "var(--color-primary)" + "40" }}
               >
                 <CheckCircle size={16} style={{ color: "var(--color-primary)" }} />
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
                     Connected as {syncProfile.display_name}
                   </div>
                   <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>{syncProfile.email}</div>
+                  <a
+                    href={`https://lifescribe.us/${syncProfile.site.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs mt-0.5"
+                    style={{ color: "var(--color-primary)" }}
+                  >
+                    {syncProfile.site.title} <ExternalLink size={10} />
+                  </a>
                 </div>
               </div>
 
@@ -173,9 +186,9 @@ export default function SettingsPage() {
               </div>
 
               {syncStatus && (
-                <div className="text-xs flex items-center gap-2" style={{ color: syncDone ? "var(--color-primary)" : "var(--color-text-muted)" }}>
+                <div className="text-xs flex items-center gap-2" style={{ color: syncResult ? "var(--color-primary)" : "var(--color-text-muted)" }}>
                   {syncing && <Loader2 size={11} className="animate-spin" />}
-                  {syncDone && <CheckCircle size={11} />}
+                  {syncResult && !syncing && <CheckCircle size={11} />}
                   {syncStatus}
                 </div>
               )}
