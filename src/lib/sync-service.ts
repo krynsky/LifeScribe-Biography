@@ -158,6 +158,203 @@ async function persistPushResults(
   }
 }
 
+async function mergePullResult(data: SyncPayload): Promise<number> {
+  let pulled = 0;
+
+  // biography — always update the single local row
+  if (data.biography) {
+    const bio = data.biography as { title?: string; tagline?: string | null; bio?: string | null };
+    await execute(
+      `UPDATE biography
+          SET title     = COALESCE(?, title),
+              tagline   = ?,
+              bio       = ?,
+              synced_at = datetime('now')
+        WHERE id = 1`,
+      [bio.title ?? null, bio.tagline ?? null, bio.bio ?? null]
+    );
+    pulled++;
+  }
+
+  // stories
+  for (const raw of (data.stories ?? []) as Array<Record<string, unknown>>) {
+    const s = raw as {
+      remote_id: string; title: string; slug?: string | null;
+      content?: string | null; excerpt?: string | null; status: string;
+      event_date?: string | null; event_date_precision?: string | null;
+    };
+    const upd = await execute(
+      `UPDATE stories
+          SET title               = ?,
+              slug                = ?,
+              content             = ?,
+              excerpt             = ?,
+              status              = ?,
+              event_date          = ?,
+              event_date_precision = ?,
+              synced_at           = datetime('now')
+        WHERE remote_id = ?`,
+      [s.title, s.slug ?? null, s.content ?? null, s.excerpt ?? null,
+       s.status, s.event_date ?? null, s.event_date_precision ?? null, s.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO stories
+           (title, slug, content, excerpt, status,
+            event_date, event_date_precision, remote_id, synced_at)
+         VALUES (?,?,?,?,?,?,?,?,datetime('now'))`,
+        [s.title, s.slug ?? null, s.content ?? null, s.excerpt ?? null,
+         s.status, s.event_date ?? null, s.event_date_precision ?? null, s.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  // milestones
+  for (const raw of (data.milestones ?? []) as Array<Record<string, unknown>>) {
+    const m = raw as {
+      remote_id: string; title: string; description?: string | null;
+      date: string; date_precision?: string | null;
+    };
+    const upd = await execute(
+      `UPDATE milestones
+          SET title          = ?,
+              description    = ?,
+              date           = ?,
+              date_precision = ?,
+              synced_at      = datetime('now')
+        WHERE remote_id = ?`,
+      [m.title, m.description ?? null, m.date, m.date_precision ?? null, m.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO milestones
+           (title, description, date, date_precision, remote_id, synced_at)
+         VALUES (?,?,?,?,?,datetime('now'))`,
+        [m.title, m.description ?? null, m.date, m.date_precision ?? null, m.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  // career entries
+  for (const raw of (data.career ?? []) as Array<Record<string, unknown>>) {
+    const c = raw as {
+      remote_id: string; organization: string; title?: string | null;
+      description?: string | null; start_date?: string | null;
+      end_date?: string | null; is_current?: boolean | number; location?: string | null;
+    };
+    const isCurrent = c.is_current === true || c.is_current === 1 ? 1 : 0;
+    const upd = await execute(
+      `UPDATE career_entries
+          SET organization = ?,
+              title        = ?,
+              description  = ?,
+              start_date   = ?,
+              end_date     = ?,
+              is_current   = ?,
+              location     = ?,
+              synced_at    = datetime('now')
+        WHERE remote_id = ?`,
+      [c.organization, c.title ?? null, c.description ?? null,
+       c.start_date ?? null, c.end_date ?? null, isCurrent,
+       c.location ?? null, c.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO career_entries
+           (organization, title, description, start_date, end_date,
+            is_current, location, remote_id, synced_at)
+         VALUES (?,?,?,?,?,?,?,?,datetime('now'))`,
+        [c.organization, c.title ?? null, c.description ?? null,
+         c.start_date ?? null, c.end_date ?? null, isCurrent,
+         c.location ?? null, c.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  // map pins
+  for (const raw of (data.map_pins ?? []) as Array<Record<string, unknown>>) {
+    const p = raw as {
+      remote_id: string; name: string; description?: string | null;
+      latitude: number; longitude: number;
+    };
+    const upd = await execute(
+      `UPDATE map_pins
+          SET name        = ?,
+              description = ?,
+              latitude    = ?,
+              longitude   = ?,
+              synced_at   = datetime('now')
+        WHERE remote_id = ?`,
+      [p.name, p.description ?? null, p.latitude, p.longitude, p.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO map_pins
+           (name, description, latitude, longitude, remote_id, synced_at)
+         VALUES (?,?,?,?,?,datetime('now'))`,
+        [p.name, p.description ?? null, p.latitude, p.longitude, p.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  // family members
+  for (const raw of (data.family_members ?? []) as Array<Record<string, unknown>>) {
+    const fm = raw as {
+      remote_id: string; given_name: string; surname?: string | null;
+      birth_date?: string | null; death_date?: string | null; bio?: string | null;
+    };
+    const upd = await execute(
+      `UPDATE family_members
+          SET given_name  = ?,
+              surname     = ?,
+              birth_date  = ?,
+              death_date  = ?,
+              bio         = ?,
+              synced_at   = datetime('now')
+        WHERE remote_id = ?`,
+      [fm.given_name, fm.surname ?? null, fm.birth_date ?? null,
+       fm.death_date ?? null, fm.bio ?? null, fm.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO family_members
+           (given_name, surname, birth_date, death_date, bio, remote_id, synced_at)
+         VALUES (?,?,?,?,?,?,datetime('now'))`,
+        [fm.given_name, fm.surname ?? null, fm.birth_date ?? null,
+         fm.death_date ?? null, fm.bio ?? null, fm.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  // albums
+  for (const raw of (data.albums ?? []) as Array<Record<string, unknown>>) {
+    const a = raw as { remote_id: string; name: string; description?: string | null };
+    const upd = await execute(
+      `UPDATE albums
+          SET name        = ?,
+              description = ?,
+              synced_at   = datetime('now')
+        WHERE remote_id = ?`,
+      [a.name, a.description ?? null, a.remote_id]
+    );
+    if (upd.rowsAffected === 0) {
+      await execute(
+        `INSERT INTO albums (name, description, remote_id, synced_at)
+         VALUES (?,?,?,datetime('now'))`,
+        [a.name, a.description ?? null, a.remote_id]
+      );
+    }
+    pulled++;
+  }
+
+  return pulled;
+}
+
 // ── Sync orchestration (local DB → remote) ────────────────────────────────
 
 import { readFile } from "@tauri-apps/plugin-fs";
