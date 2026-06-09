@@ -107,6 +107,37 @@ export async function pullFromRemote(since?: string): Promise<SyncPayload> {
   return apiRequest<SyncPayload>("GET", `/sync/pull${qs}`);
 }
 
+export async function uploadMedia(
+  filePath: string,
+  albumId?: string
+): Promise<{ url: string; mediaId: string }> {
+  const bytes = await readFile(filePath);
+  const filename = filePath.replace(/\\/g, "/").split("/").pop() ?? "file";
+  const blob = new Blob([bytes]);
+
+  const form = new FormData();
+  form.append("file", blob, filename);
+  if (albumId) form.append("albumId", albumId);
+
+  const token = getSyncToken();
+  const baseUrl = getSyncUrl().replace(/\/$/, "");
+
+  const resp = await fetch(`${baseUrl}/sync/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Upload ${resp.status}: ${text.substring(0, 200)}`);
+  }
+
+  const json = (await resp.json()) as ApiResponse<{ url: string; mediaId: string }>;
+  if (json.error) throw new Error(json.error);
+  return json.data;
+}
+
 // Renames synced_at → last_synced_at for the push API contract.
 function toApiRecord(record: Record<string, unknown>): Record<string, unknown> {
   const { synced_at, ...rest } = record;
@@ -371,33 +402,54 @@ export interface FullSyncResult {
 export async function syncToRemote(onProgress?: (msg: string) => void): Promise<FullSyncResult> {
   onProgress?.("Loading local data…");
 
-  const [biography, stories, milestones, career, map_pins, family_members, albums] = await Promise.all([
-    query<object>("SELECT * FROM biography LIMIT 1"),
-    query<object>("SELECT * FROM stories WHERE status = 'published'"),
-    query<object>("SELECT * FROM milestones"),
-    query<object>("SELECT * FROM career_entries"),
-    query<object>("SELECT * FROM map_pins"),
-    query<object>("SELECT * FROM family_members"),
-    query<object>("SELECT * FROM albums"),
-  ]);
+  const [biography, stories, milestones, career, mapPins, familyMembers, albums] =
+    await Promise.all([
+      query<Biography>("SELECT * FROM biography LIMIT 1"),
+      query<Story>("SELECT * FROM stories"),
+      query<Milestone>("SELECT * FROM milestones"),
+      query<CareerEntry>("SELECT * FROM career_entries"),
+      query<MapPin>("SELECT * FROM map_pins"),
+      query<FamilyMember>("SELECT * FROM family_members"),
+      query<Album>("SELECT * FROM albums"),
+    ]);
+
+  const bio = biography[0];
 
   const payload: SyncPayload = {
-    biography: biography[0] as object,
-    stories: stories as object[],
-    milestones: milestones as object[],
-    career: career as object[],
-    map_pins: map_pins as object[],
-    family_members: family_members as object[],
-    albums: albums as object[],
+    biography: bio ? toApiRecord(bio as unknown as Record<string, unknown>) : undefined,
+    stories: stories.map((s) => toApiRecord(s as unknown as Record<string, unknown>)),
+    milestones: milestones.map((m) => toApiRecord(m as unknown as Record<string, unknown>)),
+    career: career.map((c) => toApiRecord(c as unknown as Record<string, unknown>)),
+    map_pins: mapPins.map((p) => toApiRecord(p as unknown as Record<string, unknown>)),
+    family_members: familyMembers.map((f) => toApiRecord(f as unknown as Record<string, unknown>)),
+    albums: albums.map((a) => toApiRecord(a as unknown as Record<string, unknown>)),
   };
 
   onProgress?.("Pushing to LifeScribe.us…");
+  const pushResult = await pushToRemote(payload);
 
+  onProgress?.("Saving sync state…");
+  const batches: EntityBatch[] = [
+    { table: "stories",        typeKey: "stories",        ids: stories.map((s) => s.id) },
+    { table: "milestones",     typeKey: "milestones",     ids: milestones.map((m) => m.id) },
+    { table: "career_entries", typeKey: "career",         ids: career.map((c) => c.id) },
+    { table: "map_pins",       typeKey: "map_pins",       ids: mapPins.map((p) => p.id) },
+    { table: "family_members", typeKey: "family_members", ids: familyMembers.map((f) => f.id) },
+    { table: "albums",         typeKey: "albums",         ids: albums.map((a) => a.id) },
+  ];
+  await persistPushResults(pushResult, batches, !!bio);
+
+  onProgress?.("Pulling web changes…");
+  const syncStartedAt = new Date().toISOString();
+  const since = localStorage.getItem(STORAGE_KEY_LAST_PULL) ?? undefined;
+  let pulled = 0;
   try {
-    const result = await pushToRemote(payload);
-    onProgress?.(`Sync complete — ${result.pushed} items updated`);
-    return { pushed: result.pushed, pulled: 0, conflicts: result.conflicts, errors: [] };
+    const pullData = await pullFromRemote(since);
+    pulled = await mergePullResult(pullData);
+    localStorage.setItem(STORAGE_KEY_LAST_PULL, syncStartedAt);
   } catch (err) {
-    throw err;
+    console.error("[sync] pull failed:", err);
   }
+
+  return { pushed: pushResult.pushed, pulled, conflicts: pushResult.conflicts, errors: [] };
 }
