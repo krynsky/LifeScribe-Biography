@@ -192,6 +192,14 @@ async function persistPushResults(
   }
 }
 
+// Converts a pulled content value to a valid Tiptap JSON string or null.
+// Guards against the "null" string that can appear if the server returns
+// JSON.stringify(null) for posts with no content.
+function normalizeContent(raw: string | null | undefined): string | null {
+  if (!raw || raw === "null") return null;
+  return raw;
+}
+
 async function mergePullResult(data: SyncPayload): Promise<number> {
   let pulled = 0;
 
@@ -228,7 +236,7 @@ async function mergePullResult(data: SyncPayload): Promise<number> {
               event_date_precision = ?,
               synced_at           = datetime('now')
         WHERE remote_id = ?`,
-      [s.title, s.slug ?? null, s.content ?? null, s.excerpt ?? null,
+      [s.title, s.slug ?? null, normalizeContent(s.content), s.excerpt ?? null,
        s.status, s.event_date ?? null, s.event_date_precision ?? null, s.remote_id]
     );
     if (upd.rowsAffected === 0) {
@@ -237,7 +245,7 @@ async function mergePullResult(data: SyncPayload): Promise<number> {
            (title, slug, content, excerpt, status,
             event_date, event_date_precision, remote_id, synced_at)
          VALUES (?,?,?,?,?,?,?,?,datetime('now'))`,
-        [s.title, s.slug ?? null, s.content ?? null, s.excerpt ?? null,
+        [s.title, s.slug ?? null, normalizeContent(s.content), s.excerpt ?? null,
          s.status, s.event_date ?? null, s.event_date_precision ?? null, s.remote_id]
       );
     }
