@@ -27,7 +27,10 @@
     "http:default",
     {
       "identifier": "http:allow-fetch",
-      "allow": [{ "url": "https://lifescribe.us/**" }]
+      "allow": [
+        { "url": "https://lifescribe.us/**" },
+        { "url": "https://files.lifescribe.us/**" }
+      ]
     },
     "sql:default",
     "sql:allow-execute",

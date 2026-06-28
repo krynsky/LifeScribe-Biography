@@ -3,7 +3,8 @@
 // remote lifescribe.us REST API. Auth uses a long-lived personal access token
 // stored in localStorage (no OAuth redirect needed for a desktop app).
 
-import { readFile } from "@tauri-apps/plugin-fs";
+import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch } from "@tauri-apps/plugin-http";
 import { query, execute } from "./db";
 import type { Album, Biography, CareerEntry, FamilyMember, MapPin, Milestone, Story } from "./models";
@@ -102,6 +103,18 @@ export interface SyncPayload {
   map_pins?: object[];
   family_members?: object[];
   albums?: object[];
+  media?: PulledMedia[];
+}
+
+export interface PulledMedia {
+  remote_id: string;
+  album_remote_id: string | null;
+  url: string;
+  thumbnail_url: string | null;
+  media_type: "image" | "video";
+  filename: string;
+  size_bytes: number;
+  caption: string | null;
 }
 
 export interface SyncResult {
@@ -207,7 +220,85 @@ function normalizeContent(raw: string | null | undefined): string | null {
   return raw;
 }
 
-async function mergePullResult(data: SyncPayload): Promise<number> {
+async function downloadMediaFiles(
+  mediaItems: PulledMedia[],
+  onProgress?: (msg: string) => void
+): Promise<number> {
+  if (mediaItems.length === 0) return 0;
+
+  const dataDir = await appLocalDataDir();
+  const mediaDir = await join(dataDir, "media");
+  await mkdir(mediaDir, { recursive: true });
+
+  let downloaded = 0;
+  let processed = 0;
+
+  for (const item of mediaItems) {
+    processed++;
+    onProgress?.(`Downloading photos… ${processed}/${mediaItems.length}`);
+
+    // Skip already-downloaded items (idempotent re-pull)
+    const existing = await query<{ id: number }>(
+      "SELECT id FROM media WHERE remote_id = ?",
+      [item.remote_id]
+    );
+    if (existing.length > 0) continue;
+
+    // Resolve local album_id from the album's remote_id
+    let albumId: number | null = null;
+    if (item.album_remote_id) {
+      const rows = await query<{ id: number }>(
+        "SELECT id FROM albums WHERE remote_id = ?",
+        [item.album_remote_id]
+      );
+      albumId = rows[0]?.id ?? null;
+    }
+
+    const ext = (item.filename.split(".").pop() ?? "jpg").toLowerCase();
+    const localPath = await join(mediaDir, `${item.remote_id}.${ext}`);
+    const mimeType =
+      item.media_type === "video"
+        ? "video/mp4"
+        : `image/${ext === "jpg" ? "jpeg" : ext}`;
+
+    try {
+      const resp = await fetch(item.url);
+      if (!resp.ok) {
+        console.warn(`[sync] media download ${resp.status}: ${item.url}`);
+        continue;
+      }
+      const bytes = new Uint8Array(await resp.arrayBuffer());
+      await writeFile(localPath, bytes);
+
+      await execute(
+        `INSERT OR IGNORE INTO media
+           (file_path, thumbnail_path, filename, caption, file_size,
+            mime_type, album_id, remote_id, import_source, synced_at)
+         VALUES (?,?,?,?,?,?,?,?,'sync',datetime('now'))`,
+        [
+          localPath,
+          localPath,
+          item.filename,
+          item.caption,
+          item.size_bytes,
+          mimeType,
+          albumId,
+          item.remote_id,
+        ]
+      );
+      downloaded++;
+    } catch (err) {
+      console.error(`[sync] Failed to download media ${item.remote_id}:`, err);
+    }
+  }
+
+  return downloaded;
+}
+
+async function mergePullResult(
+  data: SyncPayload,
+  onProgress?: (msg: string) => void
+): Promise<number> {
   let pulled = 0;
 
   // biography — always update the single local row
@@ -401,6 +492,11 @@ async function mergePullResult(data: SyncPayload): Promise<number> {
     pulled++;
   }
 
+  // Download media files from remote storage
+  if (data.media?.length) {
+    pulled += await downloadMediaFiles(data.media, onProgress);
+  }
+
   return pulled;
 }
 
@@ -413,7 +509,10 @@ export interface FullSyncResult {
   errors: string[];
 }
 
-export async function syncToRemote(onProgress?: (msg: string) => void): Promise<FullSyncResult> {
+export async function syncToRemote(
+  onProgress?: (msg: string) => void,
+  fullPull = false
+): Promise<FullSyncResult> {
   onProgress?.("Loading local data…");
 
   const [biography, stories, milestones, career, mapPins, familyMembers, albums] =
@@ -455,11 +554,13 @@ export async function syncToRemote(onProgress?: (msg: string) => void): Promise<
   await persistPushResults(pushResult, batches, !!bio);
 
   onProgress?.("Pulling web changes…");
-  const since = localStorage.getItem(STORAGE_KEY_LAST_PULL) ?? undefined;
+  const since = fullPull
+    ? undefined
+    : localStorage.getItem(STORAGE_KEY_LAST_PULL) ?? undefined;
   let pulled = 0;
   try {
     const pullData = await pullFromRemote(since);
-    pulled = await mergePullResult(pullData);
+    pulled = await mergePullResult(pullData, onProgress);
     localStorage.setItem(STORAGE_KEY_LAST_PULL, syncStartedAt);
   } catch (err) {
     console.error("[sync] pull failed:", err);
