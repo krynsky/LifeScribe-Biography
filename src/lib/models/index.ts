@@ -11,8 +11,6 @@ export interface Biography {
   avatar_photo_path: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface Story {
@@ -28,8 +26,6 @@ export interface Story {
   view_count: number;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface Milestone {
@@ -43,8 +39,6 @@ export interface Milestone {
   image_path: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface Album {
@@ -56,8 +50,6 @@ export interface Album {
   date_to: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
   // Joined count
   media_count?: number;
 }
@@ -85,8 +77,6 @@ export interface Media {
   import_hash: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface FamilyMember {
@@ -100,8 +90,6 @@ export interface FamilyMember {
   photo_path: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface FamilyRelationship {
@@ -124,8 +112,6 @@ export interface CareerEntry {
   logo_path: string | null;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface MapPin {
@@ -140,8 +126,6 @@ export interface MapPin {
   color: string;
   created_at: string;
   updated_at: string;
-  synced_at: string | null;
-  remote_id: string | null;
 }
 
 export interface Category {

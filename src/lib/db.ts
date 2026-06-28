@@ -271,6 +271,53 @@ CREATE INDEX IF NOT EXISTS idx_import_items_job ON import_items(import_job_id);
 CREATE INDEX IF NOT EXISTS idx_import_items_status ON import_items(status);
 `,
   ],
+  [
+    "0002_sync_state",
+    `
+CREATE TABLE IF NOT EXISTS sync_state (
+  entity_type           TEXT NOT NULL,
+  local_id              INTEGER NOT NULL,
+  remote_id             TEXT,
+  last_synced_at        TEXT,
+  last_synced_remote_at TEXT,
+  PRIMARY KEY (entity_type, local_id)
+);
+
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'biography', id, remote_id, synced_at, NULL FROM biography WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'story', id, remote_id, synced_at, NULL FROM stories WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'milestone', id, remote_id, synced_at, NULL FROM milestones WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'career', id, remote_id, synced_at, NULL FROM career_entries WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'map_pin', id, remote_id, synced_at, NULL FROM map_pins WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'family_member', id, remote_id, synced_at, NULL FROM family_members WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'album', id, remote_id, synced_at, NULL FROM albums WHERE remote_id IS NOT NULL;
+INSERT OR IGNORE INTO sync_state (entity_type, local_id, remote_id, last_synced_at, last_synced_remote_at)
+  SELECT 'media', id, remote_id, synced_at, NULL FROM media WHERE remote_id IS NOT NULL;
+
+ALTER TABLE biography DROP COLUMN remote_id;
+ALTER TABLE biography DROP COLUMN synced_at;
+ALTER TABLE stories DROP COLUMN remote_id;
+ALTER TABLE stories DROP COLUMN synced_at;
+ALTER TABLE milestones DROP COLUMN remote_id;
+ALTER TABLE milestones DROP COLUMN synced_at;
+ALTER TABLE career_entries DROP COLUMN remote_id;
+ALTER TABLE career_entries DROP COLUMN synced_at;
+ALTER TABLE map_pins DROP COLUMN remote_id;
+ALTER TABLE map_pins DROP COLUMN synced_at;
+ALTER TABLE family_members DROP COLUMN remote_id;
+ALTER TABLE family_members DROP COLUMN synced_at;
+ALTER TABLE albums DROP COLUMN remote_id;
+ALTER TABLE albums DROP COLUMN synced_at;
+ALTER TABLE media DROP COLUMN remote_id;
+ALTER TABLE media DROP COLUMN synced_at;
+`,
+  ],
 ];
 
 // Helper to convert a local file path to a Tauri asset URL for display
