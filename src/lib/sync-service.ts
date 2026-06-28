@@ -48,7 +48,8 @@ interface ApiResponse<T> {
 async function apiRequest<T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
-  body?: unknown
+  body?: unknown,
+  _retries = 1
 ): Promise<T> {
   const token = getSyncToken();
   const baseUrl = getSyncUrl().replace(/\/$/, "");
@@ -63,6 +64,12 @@ async function apiRequest<T>(
   });
 
   if (!resp.ok) {
+    // Neon free tier auto-suspends; on a 5xx cold-start error, wait 3 s and
+    // retry once to give the database time to wake before giving up.
+    if (resp.status >= 500 && _retries > 0) {
+      await new Promise((r) => setTimeout(r, 3000));
+      return apiRequest<T>(method, path, body, _retries - 1);
+    }
     const text = await resp.text();
     throw new Error(`API ${resp.status}: ${text.substring(0, 200)}`);
   }
