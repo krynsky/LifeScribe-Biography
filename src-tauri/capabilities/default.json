@@ -18,7 +18,7 @@
     "fs:allow-remove",
     "fs:allow-exists",
     "fs:allow-stat",
-    "fs:scope-app-data-recursive",
+    "fs:scope-applocaldata-recursive",
     "fs:create-app-specific-dirs",
     "fs:read-all",
     "fs:write-all",
