@@ -46,6 +46,10 @@ import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import Youtube from "@tiptap/extension-youtube";
+import { GoogleMapsEmbed } from "./extensions/google-maps-embed";
+import { VimeoEmbed } from "./extensions/vimeo-embed";
+import { OEmbedBlock } from "./extensions/oembed-block";
 
 import EditorToolbar from "./EditorToolbar";
 
@@ -92,6 +96,10 @@ const EXTENSIONS = [
   TableRow,
   TableCell,
   TableHeader,
+  Youtube.configure({ inline: false, controls: true }),
+  GoogleMapsEmbed,
+  VimeoEmbed,
+  OEmbedBlock,
 ];
 
 export default function StoryEditor({
