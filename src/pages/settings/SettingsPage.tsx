@@ -83,6 +83,21 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleFullSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncStatus("");
+    try {
+      const result = await syncToRemote((msg) => setSyncStatus(msg), true);
+      setSyncResult(result);
+      setSyncStatus(`Re-sync complete — ${result.pushed} pushed, ${result.pulled} pulled`);
+    } catch (err) {
+      setSyncStatus("Re-sync failed: " + String(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="p-8 max-w-2xl">
       <PageHeader title="Settings" />
@@ -175,6 +190,15 @@ export default function SettingsPage() {
                 >
                   {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                   {syncing ? "Syncing…" : "Sync Now"}
+                </button>
+                <button
+                  onClick={handleFullSync}
+                  disabled={syncing}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-60"
+                  style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
+                  title="Pull down all web content, ignoring the last-sync timestamp"
+                >
+                  <RefreshCw size={13} /> Re-sync everything
                 </button>
                 <button
                   onClick={handleDisconnect}
