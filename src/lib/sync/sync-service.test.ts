@@ -114,3 +114,20 @@ describe("SyncService.publish", () => {
     expect(s2!.last_synced_at).toBe("2026-01-01T00:00:00.000Z");
   });
 });
+
+describe("SyncService.listUnpublished", () => {
+  it("returns only locally-edited linked records", async () => {
+    const store = new FakeStore();
+    store.local.story = [
+      { local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "dirty" } },
+      { local_id: 2, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "clean" } },
+    ];
+    store.state.story = [
+      { entity_type: "story", local_id: 1, remote_id: "r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" },
+      { entity_type: "story", local_id: 2, remote_id: "r2", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" },
+    ];
+    const svc = new SyncService(store, new FakeAdapter(), "web-master");
+    const list = await svc.listUnpublished();
+    expect(list).toEqual([{ entity_type: "story", local_id: 1 }]);
+  });
+});

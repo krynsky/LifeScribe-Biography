@@ -159,6 +159,36 @@ export class SyncService {
     }
   }
 
+  /** Records with local edits not yet published (dirty + linked). */
+  async listUnpublished(): Promise<Array<{ entity_type: EntityType; local_id: number }>> {
+    const out: Array<{ entity_type: EntityType; local_id: number }> = [];
+    for (const def of ENTITIES) {
+      const states = await this.store.listSyncState(def.type);
+      for (const st of states) {
+        if (!st.remote_id || !st.last_synced_at) continue;
+        const local = await this.store.getLocal(def.type, st.local_id);
+        if (local && local.updated_at > st.last_synced_at) {
+          out.push({ entity_type: def.type, local_id: st.local_id });
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Recovery: force every linked local record to be re-pulled fresh by clearing
+   * last_synced_* (so decide() sees web as changed and local as clean), then refresh().
+   */
+  async reset(onProgress?: (msg: string) => void): Promise<RefreshSummary> {
+    for (const def of ENTITIES) {
+      const states = await this.store.listSyncState(def.type);
+      for (const st of states) {
+        await this.store.putSyncState({ ...st, last_synced_remote_at: null, last_synced_at: null });
+      }
+    }
+    return this.refresh(onProgress);
+  }
+
   private async link(type: EntityType, localId: number, remote: RemoteRecord): Promise<void> {
     const local = await this.store.getLocal(type, localId);
     const st: SyncState = {
