@@ -76,12 +76,13 @@ export class RestWebAdapter implements WebAdapter {
       [def.remoteKey]: def.singleton ? items[0] : items,
     };
 
-    const result = await api<{ remote_id_map: Record<string, string>; conflicts: string[] }>(
-      "POST",
-      "/sync/push",
-      payload
-    );
+    const result = await api<{
+      remote_id_map: Record<string, string>;
+      conflicts: string[];
+      remote_updated_at_map?: Record<string, string>;
+    }>("POST", "/sync/push", payload);
     const conflicts = result.conflicts ?? [];
+    const updatedAtMap = result.remote_updated_at_map ?? {};
 
     const remoteIdMap: Record<number, string> = {};
     const remoteUpdatedAt: Record<number, string> = {};
@@ -89,12 +90,20 @@ export class RestWebAdapter implements WebAdapter {
       // Biography isn't in remote_id_map; treat as success unless a conflict mentions it.
       const failed = conflicts.some((c) => c.startsWith(def.remoteKey));
       const r0 = records[0];
-      if (!failed && r0) remoteIdMap[r0.local_id] = r0.remote_id ?? "site";
+      if (!failed && r0) {
+        remoteIdMap[r0.local_id] = r0.remote_id ?? "site";
+        const ru = updatedAtMap[`${def.remoteKey}:1`];
+        if (ru) remoteUpdatedAt[r0.local_id] = ru;
+      }
     } else {
       for (const r of records) {
         const key = `${def.remoteKey}:${r.local_id}`;
         const remoteId = result.remote_id_map[key];
-        if (remoteId) remoteIdMap[r.local_id] = remoteId;
+        if (remoteId) {
+          remoteIdMap[r.local_id] = remoteId;
+          const ru = updatedAtMap[key];
+          if (ru) remoteUpdatedAt[r.local_id] = ru;
+        }
       }
     }
     return { remoteIdMap, remoteUpdatedAt, conflicts };
