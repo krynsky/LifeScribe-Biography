@@ -49,7 +49,13 @@ export class RestWebAdapter implements WebAdapter {
     const data = await api<Record<string, Array<Record<string, unknown>>>>("GET", "/sync/pull");
     const out = {} as Record<EntityType, RemoteRecord[]>;
     for (const def of ENTITIES) {
-      const rows = (data[def.remoteKey] as Array<Record<string, unknown>>) ?? [];
+      const raw = data[def.remoteKey];
+      // Singletons (biography) come back as a single object, not an array.
+      const rows: Array<Record<string, unknown>> = def.singleton
+        ? raw
+          ? [raw as unknown as Record<string, unknown>]
+          : []
+        : ((raw as Array<Record<string, unknown>>) ?? []);
       out[def.type] = toRemoteRecords(def, rows);
     }
     return out;
