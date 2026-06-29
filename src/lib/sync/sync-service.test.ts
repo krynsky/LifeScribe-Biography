@@ -40,12 +40,12 @@ class FakeAdapter implements WebAdapter {
     };
     return { ...out, ...this.remote } as Record<EntityType, RemoteRecord[]>;
   }
-  async push(_t: EntityType, records: Array<{ local_id: number; remote_id: string | null; fields: Record<string, unknown> }>) {
+  async push(_t: EntityType, records: Array<{ local_id: number; remote_id: string | null; last_synced_remote_at: string | null; fields: Record<string, unknown> }>) {
     this.writeCalls++;
     const remoteIdMap: Record<number, string> = {};
     const remoteUpdatedAt: Record<number, string> = {};
     for (const r of records) { remoteIdMap[r.local_id] = r.remote_id ?? `new-${r.local_id}`; remoteUpdatedAt[r.local_id] = "2026-01-03T00:00:00.000Z"; }
-    return { remoteIdMap, remoteUpdatedAt };
+    return { remoteIdMap, remoteUpdatedAt, conflicts: [] as string[] };
   }
   async deleteRemote() { this.writeCalls++; }
   async downloadMedia() { return "/local/x.jpg"; }
@@ -129,5 +129,21 @@ describe("SyncService.listUnpublished", () => {
     const svc = new SyncService(store, new FakeAdapter(), "web-master");
     const list = await svc.listUnpublished();
     expect(list).toEqual([{ entity_type: "story", local_id: 1 }]);
+  });
+});
+
+describe("SyncService.publish — rejection handling", () => {
+  it("does NOT advance sync_state when the web rejects the push (stale)", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "edited" } }];
+    store.state.story = [{ entity_type: "story", local_id: 1, remote_id: "r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    const adapter = new FakeAdapter();
+    adapter.push = async () => ({ remoteIdMap: {}, remoteUpdatedAt: {}, conflicts: ["stories:1:stale"] });
+    const svc = new SyncService(store, adapter, "web-master");
+    const res = await svc.publish([{ entity_type: "story", local_id: 1 }]);
+    expect(res.published).toBe(0);
+    expect(res.errors.length).toBe(1);
+    const s1 = await store.getSyncState("story", 1);
+    expect(s1!.last_synced_at).toBe("2026-01-01T00:00:00.000Z");
   });
 });

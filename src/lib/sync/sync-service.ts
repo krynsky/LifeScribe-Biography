@@ -79,22 +79,34 @@ export class SyncService {
     }
 
     for (const [type, localIds] of byType) {
+      if (entityDef(type).binary) continue; // media is downloaded, not JSON-published
       onProgress?.(`Publishing ${type}…`);
       const records = [];
       for (const localId of localIds) {
         const local = await this.store.getLocal(type, localId);
         const st = await this.store.getSyncState(type, localId);
         if (!local) continue;
-        records.push({ local_id: localId, remote_id: st?.remote_id ?? null, fields: local.fields });
+        records.push({
+          local_id: localId,
+          remote_id: st?.remote_id ?? null,
+          last_synced_remote_at: st?.last_synced_remote_at ?? null,
+          fields: local.fields,
+        });
       }
+      if (records.length === 0) continue;
       try {
         const { remoteIdMap, remoteUpdatedAt } = await this.adapter.push(type, records);
         for (const rec of records) {
+          const remoteId = remoteIdMap[rec.local_id];
+          if (!remoteId) {
+            result.errors.push(`${type}:${rec.local_id} not published (web changed — refresh to resolve)`);
+            continue;
+          }
           const local = await this.store.getLocal(type, rec.local_id);
           await this.store.putSyncState({
             entity_type: type,
             local_id: rec.local_id,
-            remote_id: remoteIdMap[rec.local_id] ?? rec.remote_id,
+            remote_id: remoteId,
             last_synced_at: local?.updated_at ?? nowIso(),
             last_synced_remote_at: remoteUpdatedAt[rec.local_id] ?? nowIso(),
           });

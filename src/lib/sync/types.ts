@@ -54,9 +54,10 @@ export interface WebAdapter {
   /** Full pull of all entities; returns records grouped by type. */
   pullAll(): Promise<Record<EntityType, RemoteRecord[]>>;
   /** Push selected local records of one type; returns local_id -> remote_id for newly linked rows. */
-  push(type: EntityType, records: Array<{ local_id: number; remote_id: string | null; fields: Record<string, unknown> }>): Promise<{
+  push(type: EntityType, records: Array<{ local_id: number; remote_id: string | null; last_synced_remote_at: string | null; fields: Record<string, unknown> }>): Promise<{
     remoteIdMap: Record<number, string>;
     remoteUpdatedAt: Record<number, string>;
+    conflicts: string[];
   }>;
   deleteRemote(type: EntityType, remoteId: string): Promise<void>;
   /** Download one media file to local storage; returns the local file path. */

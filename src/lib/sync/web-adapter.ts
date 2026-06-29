@@ -63,26 +63,41 @@ export class RestWebAdapter implements WebAdapter {
 
   async push(
     type: EntityType,
-    records: Array<{ local_id: number; remote_id: string | null; fields: Record<string, unknown> }>
-  ): Promise<{ remoteIdMap: Record<number, string>; remoteUpdatedAt: Record<number, string> }> {
+    records: Array<{ local_id: number; remote_id: string | null; last_synced_remote_at: string | null; fields: Record<string, unknown> }>
+  ): Promise<{ remoteIdMap: Record<number, string>; remoteUpdatedAt: Record<number, string>; conflicts: string[] }> {
     const def = entityDef(type);
-    const payloadItems = records.map((r) => ({ ...r.fields, remote_id: r.remote_id, _local_id: r.local_id }));
-    const payload: Record<string, unknown> = { [def.remoteKey]: payloadItems };
+    const items = records.map((r) => ({
+      ...r.fields,
+      id: r.local_id,
+      remote_id: r.remote_id,
+      last_synced_at: r.last_synced_remote_at,
+    }));
+    const payload: Record<string, unknown> = {
+      [def.remoteKey]: def.singleton ? items[0] : items,
+    };
 
     const result = await api<{ remote_id_map: Record<string, string>; conflicts: string[] }>(
       "POST",
       "/sync/push",
       payload
     );
+    const conflicts = result.conflicts ?? [];
 
     const remoteIdMap: Record<number, string> = {};
     const remoteUpdatedAt: Record<number, string> = {};
-    for (const r of records) {
-      const key = `${def.remoteKey}:${r.local_id}`;
-      const remoteId = result.remote_id_map[key] ?? r.remote_id;
-      if (remoteId) remoteIdMap[r.local_id] = remoteId;
+    if (def.singleton) {
+      // Biography isn't in remote_id_map; treat as success unless a conflict mentions it.
+      const failed = conflicts.some((c) => c.startsWith(def.remoteKey));
+      const r0 = records[0];
+      if (!failed && r0) remoteIdMap[r0.local_id] = r0.remote_id ?? "site";
+    } else {
+      for (const r of records) {
+        const key = `${def.remoteKey}:${r.local_id}`;
+        const remoteId = result.remote_id_map[key];
+        if (remoteId) remoteIdMap[r.local_id] = remoteId;
+      }
     }
-    return { remoteIdMap, remoteUpdatedAt };
+    return { remoteIdMap, remoteUpdatedAt, conflicts };
   }
 
   async deleteRemote(type: EntityType, remoteId: string): Promise<void> {
