@@ -4,13 +4,33 @@ import type { Album, Media } from "../models";
 // Albums
 
 export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
+  // Migration 0004 adds albums.cover_image + media.remote_url. If it hasn't run
+  // yet (e.g. the app was hot-reloaded rather than restarted), fall back to a
+  // query that doesn't reference those columns so the gallery still renders.
+  const albumCols = await query<{ name: string }>("PRAGMA table_info(albums)");
+  const hasCoverCols = albumCols.some((c) => c.name === "cover_image");
+
+  if (hasCoverCols) {
+    return query<Album & { media_count: number; cover_path: string | null }>(
+      `SELECT a.*, COUNT(m.id) as media_count,
+         (SELECT c.thumbnail_path FROM media c
+            WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
+            ORDER BY
+              CASE WHEN a.cover_image IS NOT NULL AND c.remote_url = a.cover_image THEN 0 ELSE 1 END,
+              c.sort_order, c.id
+            LIMIT 1) as cover_path
+       FROM albums a
+       LEFT JOIN media m ON m.album_id = a.id
+       GROUP BY a.id
+       ORDER BY a.created_at DESC`
+    );
+  }
+
   return query<Album & { media_count: number; cover_path: string | null }>(
-    `SELECT a.*, COUNT(m.id) as media_count,
+    `SELECT a.*, NULL as cover_image, COUNT(m.id) as media_count,
        (SELECT c.thumbnail_path FROM media c
           WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
-          ORDER BY
-            CASE WHEN a.cover_image IS NOT NULL AND c.remote_url = a.cover_image THEN 0 ELSE 1 END,
-            c.sort_order, c.id
+          ORDER BY c.sort_order, c.id
           LIMIT 1) as cover_path
      FROM albums a
      LEFT JOIN media m ON m.album_id = a.id

@@ -44,7 +44,16 @@ async function runMigrations(db: Database): Promise<void> {
         .filter((s) => s.length > 0 && !s.startsWith("--"));
 
       for (const stmt of statements) {
-        await db.execute(stmt);
+        try {
+          await db.execute(stmt);
+        } catch (err) {
+          // Tolerate re-applying an ADD COLUMN that already exists (e.g. a
+          // migration that partially applied before being recorded). Any other
+          // error still propagates.
+          const msg = String(err);
+          if (/duplicate column name/i.test(msg)) continue;
+          throw err;
+        }
       }
       await db.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", [name]);
     }
