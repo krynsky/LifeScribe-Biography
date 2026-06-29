@@ -4,10 +4,11 @@ import { Plus, Image } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { listAlbums } from "@/lib/actions/gallery";
+import { localFileUrl } from "@/lib/db";
 import type { Album } from "@/lib/models";
 
 export default function GalleryPage() {
-  const [albums, setAlbums] = useState<(Album & { media_count: number })[]>([]);
+  const [albums, setAlbums] = useState<(Album & { media_count: number; cover_path: string | null })[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,10 +60,18 @@ export default function GalleryPage() {
               style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
             >
               <div
-                className="aspect-video flex items-center justify-center"
+                className="aspect-video flex items-center justify-center overflow-hidden"
                 style={{ background: "var(--color-surface-2)" }}
               >
-                <Image size={32} style={{ color: "var(--color-text-muted)" }} />
+                {album.cover_path ? (
+                  <img
+                    src={localFileUrl(album.cover_path)}
+                    alt={album.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Image size={32} style={{ color: "var(--color-text-muted)" }} />
+                )}
               </div>
               <div className="p-3">
                 <div className="font-medium text-sm" style={{ color: "var(--color-text)" }}>

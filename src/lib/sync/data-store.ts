@@ -63,6 +63,33 @@ export class SqlDataStore implements DataStore {
     await execute(`DELETE FROM ${def.table} WHERE id = ?`, [localId]);
   }
 
+  async insertSyncedMedia(row: {
+    file_path: string;
+    thumbnail_path: string;
+    filename: string;
+    caption: string | null;
+    file_size: number | null;
+    mime_type: string;
+    album_id: number | null;
+  }): Promise<number> {
+    const res = await execute(
+      `INSERT INTO media
+         (file_path, thumbnail_path, filename, caption, file_size, mime_type, album_id, import_source, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,'sync',datetime('now'),datetime('now'))`,
+      [row.file_path, row.thumbnail_path, row.filename, row.caption, row.file_size, row.mime_type, row.album_id]
+    );
+    return res.lastInsertId;
+  }
+
+  async relinkMedia(localId: number, album_id: number | null, file_size: number | null): Promise<void> {
+    // Intentionally does NOT bump updated_at — media is never locally edited.
+    await execute(`UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size) WHERE id = ?`, [
+      album_id,
+      file_size,
+      localId,
+    ]);
+  }
+
   async listSyncState(type: EntityType): Promise<SyncState[]> {
     return query<SyncState>(`SELECT * FROM sync_state WHERE entity_type = ?`, [type]);
   }

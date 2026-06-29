@@ -35,7 +35,14 @@ function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<s
   return rows.map((r) => {
     const fields: Record<string, unknown> = {};
     for (const c of def.columns) fields[c] = r[c] ?? null;
-    if (def.binary) fields.url = r.url ?? null;
+    if (def.binary) {
+      // Media needs its download URL plus the web-side names the desktop must
+      // resolve (album CUID → local album id, size_bytes → file_size).
+      fields.url = r.url ?? null;
+      fields.album_remote_id = r.album_remote_id ?? null;
+      fields.size_bytes = r.size_bytes ?? null;
+      fields.media_type = r.media_type ?? null;
+    }
     return {
       remote_id: r.remote_id as string,
       remote_updated_at: (r.updated_at as string) ?? (r.remote_updated_at as string) ?? "",
@@ -46,7 +53,9 @@ function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<s
 
 export class RestWebAdapter implements WebAdapter {
   async pullAll(): Promise<Record<EntityType, RemoteRecord[]>> {
-    const data = await api<Record<string, Array<Record<string, unknown>>>>("GET", "/sync/pull");
+    // limit=500 is the server's max; without it the route defaults to 50,
+    // truncating large media sets. (Pagination is a future need beyond 500.)
+    const data = await api<Record<string, Array<Record<string, unknown>>>>("GET", "/sync/pull?limit=500");
     const out = {} as Record<EntityType, RemoteRecord[]>;
     for (const def of ENTITIES) {
       const raw = data[def.remoteKey];

@@ -43,6 +43,19 @@ export interface DataStore {
   updateLocalById(type: EntityType, localId: number, fields: Record<string, unknown>): Promise<void>;
   deleteLocal(type: EntityType, localId: number): Promise<void>;
 
+  /** Insert a downloaded media row (binary entity; needs file_path which is NOT NULL). Returns local id. */
+  insertSyncedMedia(row: {
+    file_path: string;
+    thumbnail_path: string;
+    filename: string;
+    caption: string | null;
+    file_size: number | null;
+    mime_type: string;
+    album_id: number | null;
+  }): Promise<number>;
+  /** Repair an existing media row's album link + size without re-downloading or bumping updated_at. */
+  relinkMedia(localId: number, album_id: number | null, file_size: number | null): Promise<void>;
+
   listSyncState(type: EntityType): Promise<SyncState[]>;
   getSyncState(type: EntityType, localId: number): Promise<SyncState | null>;
   getSyncStateByRemote(type: EntityType, remoteId: string): Promise<SyncState | null>;

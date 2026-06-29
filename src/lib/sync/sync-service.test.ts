@@ -19,6 +19,15 @@ class FakeStore implements DataStore {
     if (r) r.fields = fields;
   }
   async deleteLocal(t: EntityType, id: number) { this.local[t] = (this.local[t] ?? []).filter((r) => r.local_id !== id); }
+  async insertSyncedMedia(row: { file_path: string; thumbnail_path: string; filename: string; caption: string | null; file_size: number | null; mime_type: string; album_id: number | null }) {
+    const id = this.nextId++;
+    (this.local.media ??= []).push({ local_id: id, updated_at: "2026-01-01T00:00:00.000Z", fields: { ...row } });
+    return id;
+  }
+  async relinkMedia(localId: number, album_id: number | null, file_size: number | null) {
+    const r = (this.local.media ?? []).find((x) => x.local_id === localId);
+    if (r) { r.fields.album_id = album_id; if (file_size != null) r.fields.file_size = file_size; }
+  }
   async listSyncState(t: EntityType) { return this.state[t] ?? []; }
   async getSyncState(t: EntityType, id: number) { return (this.state[t] ?? []).find((s) => s.local_id === id) ?? null; }
   async getSyncStateByRemote(t: EntityType, rid: string) { return (this.state[t] ?? []).find((s) => s.remote_id === rid) ?? null; }
@@ -145,5 +154,45 @@ describe("SyncService.publish — rejection handling", () => {
     expect(res.errors.length).toBe(1);
     const s1 = await store.getSyncState("story", 1);
     expect(s1!.last_synced_at).toBe("2026-01-01T00:00:00.000Z");
+  });
+});
+
+describe("SyncService.refresh — media album linkage", () => {
+  it("create_local resolves album_remote_id to the local album id", async () => {
+    const store = new FakeStore();
+    // Album already exists locally and is linked (localid 7 <-> web "alb-r1").
+    store.local.album = [{ local_id: 7, updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Trip" } }];
+    store.state.album = [{ entity_type: "album", local_id: 7, remote_id: "alb-r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    const adapter = new FakeAdapter({
+      // Album must be in the pull too, else refresh's delete-reconciliation removes it.
+      album: [{ remote_id: "alb-r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Trip" } }],
+      media: [{ remote_id: "m1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { filename: "p.jpg", caption: null, album_remote_id: "alb-r1", size_bytes: 123, media_type: "image" } }],
+    });
+    const svc = new SyncService(store, adapter, "web-master");
+    const summary = await svc.refresh();
+    expect(summary.created).toBe(1);
+    expect(store.local.media!.length).toBe(1);
+    expect(store.local.media![0].fields.album_id).toBe(7); // resolved, not null
+    expect(store.local.media![0].fields.file_path).toBe("/local/x.jpg");
+    expect(store.local.media![0].fields.file_size).toBe(123); // size_bytes -> file_size
+  });
+
+  it("take_web relinks an existing media row WITHOUT re-downloading", async () => {
+    const store = new FakeStore();
+    store.local.album = [{ local_id: 7, updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Trip" } }];
+    store.state.album = [{ entity_type: "album", local_id: 7, remote_id: "alb-r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    // Existing media row with NO album link, baseline cleared (as after a reset).
+    store.local.media = [{ local_id: 50, updated_at: "2026-01-01T00:00:00.000Z", fields: { filename: "p.jpg", album_id: null } }];
+    store.state.media = [{ entity_type: "media", local_id: 50, remote_id: "m1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: null }];
+    const adapter = new FakeAdapter({
+      album: [{ remote_id: "alb-r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Trip" } }],
+      media: [{ remote_id: "m1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { filename: "p.jpg", album_remote_id: "alb-r1", size_bytes: 99, media_type: "image" } }],
+    });
+    let downloads = 0;
+    adapter.downloadMedia = async () => { downloads++; return "/local/x.jpg"; };
+    const svc = new SyncService(store, adapter, "web-master");
+    await svc.refresh();
+    expect(downloads).toBe(0); // no re-download
+    expect(store.local.media![0].fields.album_id).toBe(7); // relinked
   });
 });

@@ -3,9 +3,12 @@ import type { Album, Media } from "../models";
 
 // Albums
 
-export async function listAlbums(): Promise<(Album & { media_count: number })[]> {
-  return query<Album & { media_count: number }>(
-    `SELECT a.*, COUNT(m.id) as media_count
+export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
+  return query<Album & { media_count: number; cover_path: string | null }>(
+    `SELECT a.*, COUNT(m.id) as media_count,
+       (SELECT thumbnail_path FROM media
+          WHERE album_id = a.id AND thumbnail_path IS NOT NULL
+          ORDER BY sort_order, id LIMIT 1) as cover_path
      FROM albums a
      LEFT JOIN media m ON m.album_id = a.id
      GROUP BY a.id

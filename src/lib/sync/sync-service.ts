@@ -18,6 +18,14 @@ export interface RefreshSummary {
 
 const nowIso = () => new Date().toISOString();
 
+/** Derive a mime type for a downloaded media file from its web metadata. */
+function mimeForMedia(fields: Record<string, unknown>): string {
+  if (fields.media_type === "video") return "video/mp4";
+  const filename = (fields.filename as string) ?? "";
+  const ext = (filename.split(".").pop() ?? "jpg").toLowerCase();
+  return `image/${ext === "jpg" ? "jpeg" : ext}`;
+}
+
 export class SyncService {
   constructor(
     private store: DataStore,
@@ -141,12 +149,15 @@ export class SyncService {
         if (def.binary) {
           onProgress?.(`Downloading ${remote.fields.filename ?? "media"}…`);
           const path = await this.adapter.downloadMedia(remote);
-          const localId = await this.store.upsertLocal(type, {
-            ...remote.fields,
+          const albumId = await this.resolveAlbumId(remote.fields.album_remote_id as string | null);
+          const localId = await this.store.insertSyncedMedia({
             file_path: path,
             thumbnail_path: path,
-            mime_type: "image/jpeg",
-            import_source: "sync",
+            filename: (remote.fields.filename as string) ?? "file",
+            caption: (remote.fields.caption as string | null) ?? null,
+            file_size: (remote.fields.size_bytes as number | null) ?? null,
+            mime_type: mimeForMedia(remote.fields),
+            album_id: albumId,
           });
           await this.link(type, localId, remote);
         } else {
@@ -157,7 +168,19 @@ export class SyncService {
         break;
       }
       case "take_web": {
-        if (!def.binary && existing) {
+        if (def.binary) {
+          // Don't re-download an existing file; just repair its album link + size.
+          if (existing) {
+            const albumId = await this.resolveAlbumId(remote.fields.album_remote_id as string | null);
+            await this.store.relinkMedia(
+              existing.local_id,
+              albumId,
+              (remote.fields.size_bytes as number | null) ?? null
+            );
+            await this.link(type, existing.local_id, remote);
+            summary.updated++;
+          }
+        } else if (existing) {
           await this.store.updateLocalById(type, existing.local_id, remote.fields);
           await this.link(type, existing.local_id, remote);
           summary.updated++;
@@ -169,6 +192,13 @@ export class SyncService {
         break;
       }
     }
+  }
+
+  /** Resolve a web album CUID to its local album id via the album's sync_state. */
+  private async resolveAlbumId(albumRemoteId: string | null | undefined): Promise<number | null> {
+    if (!albumRemoteId) return null;
+    const st = await this.store.getSyncStateByRemote("album", albumRemoteId);
+    return st?.local_id ?? null;
   }
 
   /** Records with local edits not yet published (dirty + linked). */
