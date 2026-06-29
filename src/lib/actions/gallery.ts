@@ -4,36 +4,43 @@ import type { Album, Media } from "../models";
 // Albums
 
 export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
-  // Preferred query honours the explicit cover (migration 0004 columns). If
-  // those columns don't exist yet, fall back to a first-photo cover so the
-  // gallery always renders.
-  try {
-    return await query<Album & { media_count: number; cover_path: string | null }>(
-      `SELECT a.*, COUNT(m.id) as media_count,
-         (SELECT c.thumbnail_path FROM media c
-            WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
-            ORDER BY
-              CASE WHEN a.cover_image IS NOT NULL AND c.remote_url = a.cover_image THEN 0 ELSE 1 END,
-              c.sort_order, c.id
-            LIMIT 1) as cover_path
+  // 1) Albums with their media counts (simple, no correlated subquery).
+  const albums = await query<Album & { media_count: number }>(
+    `SELECT a.*, COUNT(m.id) as media_count
        FROM albums a
        LEFT JOIN media m ON m.album_id = a.id
        GROUP BY a.id
        ORDER BY a.created_at DESC`
-    );
-  } catch {
-    return query<Album & { media_count: number; cover_path: string | null }>(
-      `SELECT a.*, NULL as cover_image, COUNT(m.id) as media_count,
-         (SELECT c.thumbnail_path FROM media c
-            WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
-            ORDER BY c.sort_order, c.id
-            LIMIT 1) as cover_path
-       FROM albums a
-       LEFT JOIN media m ON m.album_id = a.id
-       GROUP BY a.id
-       ORDER BY a.created_at DESC`
-    );
+  );
+
+  // 2) Resolve each album's cover with a plain parameterized query. This avoids
+  // a correlated subquery referencing a.cover_image, which the app's SQLite
+  // (sqlx) rejects. Prefer the explicit cover (remote_url == cover_image),
+  // else the first photo.
+  const result: (Album & { media_count: number; cover_path: string | null })[] = [];
+  for (const a of albums) {
+    const coverImage = (a as { cover_image?: string | null }).cover_image ?? null;
+    let cover: { thumbnail_path: string }[] = [];
+    try {
+      cover = await query<{ thumbnail_path: string }>(
+        `SELECT thumbnail_path FROM media
+           WHERE album_id = ? AND thumbnail_path IS NOT NULL
+           ORDER BY CASE WHEN ? IS NOT NULL AND remote_url = ? THEN 0 ELSE 1 END, sort_order, id
+           LIMIT 1`,
+        [a.id, coverImage, coverImage]
+      );
+    } catch {
+      // remote_url column may not exist (pre-migration) — fall back to first photo.
+      cover = await query<{ thumbnail_path: string }>(
+        `SELECT thumbnail_path FROM media
+           WHERE album_id = ? AND thumbnail_path IS NOT NULL
+           ORDER BY sort_order, id LIMIT 1`,
+        [a.id]
+      );
+    }
+    result.push({ ...a, cover_path: cover[0]?.thumbnail_path ?? null });
   }
+  return result;
 }
 
 export async function getAlbum(id: number): Promise<Album | null> {
