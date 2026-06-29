@@ -4,9 +4,10 @@ import PageHeader from "@/components/ui/PageHeader";
 import { getApiKey, saveApiKey } from "@/lib/ai-curator";
 import {
   getSyncToken, getSyncUrl, saveSyncCredentials, clearSyncCredentials,
-  isSyncConfigured, testConnection, syncToRemote,
-  type RemoteProfile,
-} from "@/lib/sync-service";
+  isSyncConfigured, getSyncMode, setSyncMode,
+  makeSyncService, type SyncMode, type ConflictItem,
+} from "@/lib/sync";
+import { testConnection, type RemoteProfile } from "@/lib/sync/web-profile";
 
 export default function SettingsPage() {
   // Claude API key
@@ -22,6 +23,9 @@ export default function SettingsPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState("");
   const [syncResult, setSyncResult] = useState<{ pushed: number; pulled: number; conflicts: string[] } | null>(null);
+  const [mode, setMode] = useState<SyncMode>(getSyncMode());
+  const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
+  const [unpublished, setUnpublished] = useState<Array<{ entity_type: string; local_id: number }>>([]);
 
   useEffect(() => {
     setApiKey(getApiKey());
@@ -31,6 +35,7 @@ export default function SettingsPage() {
       testConnection()
         .then(setSyncProfile)
         .catch(() => setSyncProfile(null));
+      makeSyncService().listUnpublished().then(setUnpublished).catch(() => {});
     }
   }, []);
 
@@ -65,34 +70,55 @@ export default function SettingsPage() {
     setSyncError("");
   }
 
-  async function handleSync() {
+  function handleModeChange(m: SyncMode) {
+    setSyncMode(m);
+    setMode(m);
+  }
+
+  async function handleRefresh() {
     setSyncing(true);
     setSyncResult(null);
     setSyncStatus("");
     try {
-      const result = await syncToRemote((msg) => setSyncStatus(msg));
-      setSyncResult(result);
-      const conflictNote = result.conflicts.length > 0
-        ? ` · ${result.conflicts.length} conflict${result.conflicts.length > 1 ? "s" : ""} — resolve at lifescribe.us`
-        : "";
-      setSyncStatus(`Sync complete — ${result.pushed} pushed, ${result.pulled} pulled${conflictNote}`);
+      const svc = makeSyncService();
+      const summary = await svc.refresh((msg) => setSyncStatus(msg));
+      setConflicts(summary.conflicts);
+      setUnpublished(await svc.listUnpublished());
+      setSyncResult({ pushed: 0, pulled: summary.created + summary.updated, conflicts: summary.conflicts.map((c) => `${c.entity_type}:${c.remote_id}`) });
+      setSyncStatus(`Refreshed — ${summary.created} new, ${summary.updated} updated, ${summary.deleted} removed, ${summary.conflicts.length} conflicts`);
     } catch (err) {
-      setSyncStatus("Sync failed: " + String(err));
+      setSyncStatus("Refresh failed: " + String(err));
     } finally {
       setSyncing(false);
     }
   }
 
-  async function handleFullSync() {
+  async function handleResetRefresh() {
     setSyncing(true);
-    setSyncResult(null);
     setSyncStatus("");
     try {
-      const result = await syncToRemote((msg) => setSyncStatus(msg), true);
-      setSyncResult(result);
-      setSyncStatus(`Re-sync complete — ${result.pushed} pushed, ${result.pulled} pulled`);
+      const svc = makeSyncService();
+      const summary = await svc.reset((msg) => setSyncStatus(msg));
+      setSyncStatus(`Reset complete — ${summary.created + summary.updated} records refreshed from web`);
+      setUnpublished(await svc.listUnpublished());
     } catch (err) {
-      setSyncStatus("Re-sync failed: " + String(err));
+      setSyncStatus("Reset failed: " + String(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handlePublishAll() {
+    setSyncing(true);
+    setSyncStatus("");
+    try {
+      const svc = makeSyncService();
+      const items = await svc.listUnpublished();
+      const res = await svc.publish(items, (msg) => setSyncStatus(msg));
+      setUnpublished(await svc.listUnpublished());
+      setSyncStatus(`Published ${res.published} item${res.published === 1 ? "" : "s"}${res.errors.length ? ` · ${res.errors.length} failed` : ""}`);
+    } catch (err) {
+      setSyncStatus("Publish failed: " + String(err));
     } finally {
       setSyncing(false);
     }
@@ -181,32 +207,59 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-60"
-                  style={{ background: "var(--color-primary)" }}
-                >
-                  {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                  {syncing ? "Syncing…" : "Sync Now"}
-                </button>
-                <button
-                  onClick={handleFullSync}
-                  disabled={syncing}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-60"
-                  style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
-                  title="Pull down all web content, ignoring the last-sync timestamp"
-                >
-                  <RefreshCw size={13} /> Re-sync everything
-                </button>
-                <button
-                  onClick={handleDisconnect}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border"
-                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-                >
-                  <LogOut size={13} /> Disconnect
-                </button>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Source of truth</label>
+                  <select
+                    value={mode}
+                    onChange={(e) => handleModeChange(e.target.value as SyncMode)}
+                    className="px-3 py-2 rounded-lg border text-sm"
+                    style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
+                  >
+                    <option value="web-master">Web is master</option>
+                    <option value="app-master">App is master</option>
+                    <option value="standalone">Standalone (no sync)</option>
+                  </select>
+                </div>
+
+                {mode !== "standalone" && (
+                  <div className="flex gap-2 flex-wrap">
+                    <button onClick={handleRefresh} disabled={syncing}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-60"
+                      style={{ background: "var(--color-primary)" }}>
+                      {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                      {syncing ? "Working…" : "Refresh from web"}
+                    </button>
+                    <button onClick={handlePublishAll} disabled={syncing || unpublished.length === 0}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-50"
+                      style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
+                      title="Push your unpublished local edits to the web">
+                      Publish{unpublished.length ? ` (${unpublished.length})` : ""}
+                    </button>
+                    <button onClick={handleResetRefresh} disabled={syncing}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border disabled:opacity-60"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+                      title="Discard local copies of web content and re-pull everything fresh">
+                      Reset &amp; re-pull
+                    </button>
+                    <button onClick={handleDisconnect}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
+                      <LogOut size={13} /> Disconnect
+                    </button>
+                  </div>
+                )}
+
+                {conflicts.length > 0 && (
+                  <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "var(--color-border)" }}>
+                    <div className="font-medium mb-1" style={{ color: "var(--color-text)" }}>
+                      {conflicts.length} conflict{conflicts.length === 1 ? "" : "s"} — edited on both sides
+                    </div>
+                    <div style={{ color: "var(--color-text-muted)" }}>
+                      Resolve by either re-pulling (keep web) or publishing (keep your version) the affected items.
+                    </div>
+                  </div>
+                )}
               </div>
 
               {syncStatus && (
