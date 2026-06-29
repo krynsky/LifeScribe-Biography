@@ -90,3 +90,27 @@ describe("SyncService.refresh — incident regression", () => {
     expect((store.state.story ?? []).length).toBe(1);
   });
 });
+
+describe("SyncService.publish", () => {
+  it("pushes only the selected items and advances sync_state", async () => {
+    const store = new FakeStore();
+    store.local.story = [
+      { local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "edited A" } },
+      { local_id: 2, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "edited B" } },
+    ];
+    store.state.story = [
+      { entity_type: "story", local_id: 1, remote_id: "r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" },
+      { entity_type: "story", local_id: 2, remote_id: "r2", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" },
+    ];
+    const adapter = new FakeAdapter();
+    const svc = new SyncService(store, adapter, "web-master");
+
+    await svc.publish([{ entity_type: "story", local_id: 1 }]);
+
+    expect(adapter.writeCalls).toBe(1);
+    const s1 = await store.getSyncState("story", 1);
+    expect(s1!.last_synced_at).toBe("2026-01-03T00:00:00.000Z");
+    const s2 = await store.getSyncState("story", 2);
+    expect(s2!.last_synced_at).toBe("2026-01-01T00:00:00.000Z");
+  });
+});

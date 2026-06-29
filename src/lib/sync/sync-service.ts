@@ -66,6 +66,47 @@ export class SyncService {
     return summary;
   }
 
+  async publish(
+    items: Array<{ entity_type: EntityType; local_id: number }>,
+    onProgress?: (msg: string) => void
+  ): Promise<{ published: number; errors: string[] }> {
+    const result = { published: 0, errors: [] as string[] };
+    if (this.mode === "standalone") return result;
+
+    const byType = new Map<EntityType, number[]>();
+    for (const it of items) {
+      byType.set(it.entity_type, [...(byType.get(it.entity_type) ?? []), it.local_id]);
+    }
+
+    for (const [type, localIds] of byType) {
+      onProgress?.(`Publishing ${type}…`);
+      const records = [];
+      for (const localId of localIds) {
+        const local = await this.store.getLocal(type, localId);
+        const st = await this.store.getSyncState(type, localId);
+        if (!local) continue;
+        records.push({ local_id: localId, remote_id: st?.remote_id ?? null, fields: local.fields });
+      }
+      try {
+        const { remoteIdMap, remoteUpdatedAt } = await this.adapter.push(type, records);
+        for (const rec of records) {
+          const local = await this.store.getLocal(type, rec.local_id);
+          await this.store.putSyncState({
+            entity_type: type,
+            local_id: rec.local_id,
+            remote_id: remoteIdMap[rec.local_id] ?? rec.remote_id,
+            last_synced_at: local?.updated_at ?? nowIso(),
+            last_synced_remote_at: remoteUpdatedAt[rec.local_id] ?? nowIso(),
+          });
+          result.published++;
+        }
+      } catch (e) {
+        result.errors.push(`${type}: ${(e as Error).message}`);
+      }
+    }
+    return result;
+  }
+
   private async applyRemote(
     type: EntityType,
     remote: RemoteRecord,
