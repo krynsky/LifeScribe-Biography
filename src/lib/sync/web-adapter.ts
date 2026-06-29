@@ -39,6 +39,7 @@ function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<s
       // Media needs its download URL plus the web-side names the desktop must
       // resolve (album CUID → local album id, size_bytes → file_size).
       fields.url = r.url ?? null;
+      fields.thumbnail_url = r.thumbnail_url ?? null;
       fields.album_remote_id = r.album_remote_id ?? null;
       fields.size_bytes = r.size_bytes ?? null;
       fields.media_type = r.media_type ?? null;
@@ -124,15 +125,21 @@ export class RestWebAdapter implements WebAdapter {
   }
 
   async downloadMedia(remote: RemoteRecord): Promise<string> {
-    const url = remote.fields.url as string;
+    // Videos (e.g. YouTube) have no downloadable file — fetch their thumbnail
+    // image instead so the gallery has something to show; playback uses the
+    // embed URL (stored as source_url) in the lightbox.
+    const isVideo = remote.fields.media_type === "video";
+    const fetchUrl = (isVideo ? remote.fields.thumbnail_url : remote.fields.url) as string | null;
+    if (!fetchUrl) throw new Error(`no download URL for media ${remote.remote_id}`);
+
     const filename = (remote.fields.filename as string) ?? "file";
-    const ext = (filename.split(".").pop() ?? "jpg").toLowerCase();
+    const ext = isVideo ? "jpg" : (filename.split(".").pop() ?? "jpg").toLowerCase();
     const dataDir = await appLocalDataDir();
     const mediaDir = await join(dataDir, "media");
     await mkdir(mediaDir, { recursive: true });
     const localPath = await join(mediaDir, `${remote.remote_id}.${ext}`);
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`media download ${resp.status}: ${url}`);
+    const resp = await fetch(fetchUrl);
+    if (!resp.ok) throw new Error(`media download ${resp.status}: ${fetchUrl}`);
     const bytes = new Uint8Array(await resp.arrayBuffer());
     await writeFile(localPath, bytes);
     return localPath;

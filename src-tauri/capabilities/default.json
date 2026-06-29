@@ -29,7 +29,8 @@
       "identifier": "http:allow-fetch",
       "allow": [
         { "url": "https://lifescribe.us/**" },
-        { "url": "https://files.lifescribe.us/**" }
+        { "url": "https://files.lifescribe.us/**" },
+        { "url": "https://img.youtube.com/**" }
       ]
     },
     "sql:default",

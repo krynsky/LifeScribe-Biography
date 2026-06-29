@@ -75,6 +75,7 @@ export interface Media {
   is_favorite: boolean;
   import_source: string | null;
   import_hash: string | null;
+  source_url: string | null; // video media: external embed URL (e.g. YouTube)
   created_at: string;
   updated_at: string;
 }

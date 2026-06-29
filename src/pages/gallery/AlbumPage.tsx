@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Image, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Image, X, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { getAlbum, listMedia } from "@/lib/actions/gallery";
 import { localFileUrl } from "@/lib/db";
 import type { Album, Media } from "@/lib/models";
@@ -58,7 +58,7 @@ export default function AlbumPage() {
             <button
               key={photo.id}
               onClick={() => setLightboxIdx(idx)}
-              className="aspect-square rounded-lg overflow-hidden border hover:opacity-90 transition-opacity"
+              className="relative aspect-square rounded-lg overflow-hidden border hover:opacity-90 transition-opacity"
               style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
             >
               {photo.thumbnail_path ? (
@@ -71,6 +71,13 @@ export default function AlbumPage() {
                 <div className="w-full h-full flex items-center justify-center">
                   <Image size={20} style={{ color: "var(--color-text-muted)" }} />
                 </div>
+              )}
+              {photo.source_url && (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="flex items-center justify-center w-10 h-10 rounded-full" style={{ background: "rgba(0,0,0,0.55)" }}>
+                    <Play size={18} fill="white" style={{ color: "white" }} />
+                  </span>
+                </span>
               )}
             </button>
           ))}
@@ -102,13 +109,24 @@ export default function AlbumPage() {
             <ChevronLeft size={22} />
           </button>
 
-          {/* Image */}
+          {/* Image or video */}
           <div className="max-w-5xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={localFileUrl(lightboxPhoto.file_path)}
-              alt={lightboxPhoto.title ?? lightboxPhoto.filename}
-              className="max-w-full max-h-[80vh] object-contain rounded-lg"
-            />
+            {lightboxPhoto.source_url ? (
+              <iframe
+                src={lightboxPhoto.source_url}
+                title={lightboxPhoto.title ?? lightboxPhoto.filename}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="rounded-lg"
+                style={{ width: "min(90vw, 960px)", aspectRatio: "16 / 9", border: 0 }}
+              />
+            ) : (
+              <img
+                src={localFileUrl(lightboxPhoto.file_path)}
+                alt={lightboxPhoto.title ?? lightboxPhoto.filename}
+                className="max-w-full max-h-[80vh] object-contain rounded-lg"
+              />
+            )}
             {(lightboxPhoto.title || lightboxPhoto.caption) && (
               <div className="mt-3 text-center">
                 {lightboxPhoto.title && (

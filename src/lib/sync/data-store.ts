@@ -71,12 +71,13 @@ export class SqlDataStore implements DataStore {
     file_size: number | null;
     mime_type: string;
     album_id: number | null;
+    source_url: string | null;
   }): Promise<number> {
     const res = await execute(
       `INSERT INTO media
-         (file_path, thumbnail_path, filename, caption, file_size, mime_type, album_id, import_source, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,'sync',datetime('now'),datetime('now'))`,
-      [row.file_path, row.thumbnail_path, row.filename, row.caption, row.file_size, row.mime_type, row.album_id]
+         (file_path, thumbnail_path, filename, caption, file_size, mime_type, album_id, source_url, import_source, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,'sync',datetime('now'),datetime('now'))`,
+      [row.file_path, row.thumbnail_path, row.filename, row.caption, row.file_size, row.mime_type, row.album_id, row.source_url]
     );
     return res.lastInsertId;
   }

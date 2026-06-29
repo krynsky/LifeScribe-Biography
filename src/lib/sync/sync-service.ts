@@ -150,6 +150,7 @@ export class SyncService {
           onProgress?.(`Downloading ${remote.fields.filename ?? "media"}…`);
           const path = await this.adapter.downloadMedia(remote);
           const albumId = await this.resolveAlbumId(remote.fields.album_remote_id as string | null);
+          const isVideo = remote.fields.media_type === "video";
           const localId = await this.store.insertSyncedMedia({
             file_path: path,
             thumbnail_path: path,
@@ -158,6 +159,7 @@ export class SyncService {
             file_size: (remote.fields.size_bytes as number | null) ?? null,
             mime_type: mimeForMedia(remote.fields),
             album_id: albumId,
+            source_url: isVideo ? ((remote.fields.url as string | null) ?? null) : null,
           });
           await this.link(type, localId, remote);
         } else {

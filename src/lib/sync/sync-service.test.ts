@@ -19,7 +19,7 @@ class FakeStore implements DataStore {
     if (r) r.fields = fields;
   }
   async deleteLocal(t: EntityType, id: number) { this.local[t] = (this.local[t] ?? []).filter((r) => r.local_id !== id); }
-  async insertSyncedMedia(row: { file_path: string; thumbnail_path: string; filename: string; caption: string | null; file_size: number | null; mime_type: string; album_id: number | null }) {
+  async insertSyncedMedia(row: { file_path: string; thumbnail_path: string; filename: string; caption: string | null; file_size: number | null; mime_type: string; album_id: number | null; source_url: string | null }) {
     const id = this.nextId++;
     (this.local.media ??= []).push({ local_id: id, updated_at: "2026-01-01T00:00:00.000Z", fields: { ...row } });
     return id;
@@ -194,5 +194,20 @@ describe("SyncService.refresh — media album linkage", () => {
     await svc.refresh();
     expect(downloads).toBe(0); // no re-download
     expect(store.local.media![0].fields.album_id).toBe(7); // relinked
+  });
+
+  it("stores source_url for video media (YouTube)", async () => {
+    const store = new FakeStore();
+    store.local.album = [{ local_id: 7, updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Adventures" } }];
+    store.state.album = [{ entity_type: "album", local_id: 7, remote_id: "alb-r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    const adapter = new FakeAdapter({
+      album: [{ remote_id: "alb-r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { name: "Adventures" } }],
+      media: [{ remote_id: "v1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { filename: "YouTube - abc", album_remote_id: "alb-r1", size_bytes: null, media_type: "video", url: "https://www.youtube.com/embed/abc", thumbnail_url: "https://img.youtube.com/vi/abc/hqdefault.jpg" } }],
+    });
+    const svc = new SyncService(store, adapter, "web-master");
+    await svc.refresh();
+    expect(store.local.media!.length).toBe(1);
+    expect(store.local.media![0].fields.source_url).toBe("https://www.youtube.com/embed/abc");
+    expect(store.local.media![0].fields.album_id).toBe(7);
   });
 });

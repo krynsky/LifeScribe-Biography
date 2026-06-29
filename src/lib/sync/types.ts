@@ -52,6 +52,7 @@ export interface DataStore {
     file_size: number | null;
     mime_type: string;
     album_id: number | null;
+    source_url: string | null;
   }): Promise<number>;
   /** Repair an existing media row's album link + size without re-downloading or bumping updated_at. */
   relinkMedia(localId: number, album_id: number | null, file_size: number | null): Promise<void>;
