@@ -4,14 +4,11 @@ import type { Album, Media } from "../models";
 // Albums
 
 export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
-  // Migration 0004 adds albums.cover_image + media.remote_url. If it hasn't run
-  // yet (e.g. the app was hot-reloaded rather than restarted), fall back to a
-  // query that doesn't reference those columns so the gallery still renders.
-  const albumCols = await query<{ name: string }>("PRAGMA table_info(albums)");
-  const hasCoverCols = albumCols.some((c) => c.name === "cover_image");
-
-  if (hasCoverCols) {
-    return query<Album & { media_count: number; cover_path: string | null }>(
+  // Preferred query honours the explicit cover (migration 0004 columns). If
+  // those columns don't exist yet, fall back to a first-photo cover so the
+  // gallery always renders.
+  try {
+    return await query<Album & { media_count: number; cover_path: string | null }>(
       `SELECT a.*, COUNT(m.id) as media_count,
          (SELECT c.thumbnail_path FROM media c
             WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
@@ -24,19 +21,19 @@ export async function listAlbums(): Promise<(Album & { media_count: number; cove
        GROUP BY a.id
        ORDER BY a.created_at DESC`
     );
+  } catch {
+    return query<Album & { media_count: number; cover_path: string | null }>(
+      `SELECT a.*, NULL as cover_image, COUNT(m.id) as media_count,
+         (SELECT c.thumbnail_path FROM media c
+            WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
+            ORDER BY c.sort_order, c.id
+            LIMIT 1) as cover_path
+       FROM albums a
+       LEFT JOIN media m ON m.album_id = a.id
+       GROUP BY a.id
+       ORDER BY a.created_at DESC`
+    );
   }
-
-  return query<Album & { media_count: number; cover_path: string | null }>(
-    `SELECT a.*, NULL as cover_image, COUNT(m.id) as media_count,
-       (SELECT c.thumbnail_path FROM media c
-          WHERE c.album_id = a.id AND c.thumbnail_path IS NOT NULL
-          ORDER BY c.sort_order, c.id
-          LIMIT 1) as cover_path
-     FROM albums a
-     LEFT JOIN media m ON m.album_id = a.id
-     GROUP BY a.id
-     ORDER BY a.created_at DESC`
-  );
 }
 
 export async function getAlbum(id: number): Promise<Album | null> {
