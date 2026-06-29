@@ -64,7 +64,7 @@ export const ENTITIES: EntityDef[] = [
     type: "album",
     table: "albums",
     remoteKey: "albums",
-    columns: ["name", "description"],
+    columns: ["name", "description", "cover_image"],
   },
   {
     type: "media",

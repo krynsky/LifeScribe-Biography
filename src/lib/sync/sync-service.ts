@@ -26,6 +26,16 @@ function mimeForMedia(fields: Record<string, unknown>): string {
   return `image/${ext === "jpg" ? "jpeg" : ext}`;
 }
 
+/**
+ * The web-side URL an album's explicit coverImage is matched against.
+ * The web stores coverImage as a media's url OR thumbnailUrl, so for videos
+ * (whose url is a non-image embed) we match on the thumbnail instead.
+ */
+function matchableUrl(fields: Record<string, unknown>): string | null {
+  if (fields.media_type === "video") return (fields.thumbnail_url as string | null) ?? null;
+  return (fields.url as string | null) ?? null;
+}
+
 export class SyncService {
   constructor(
     private store: DataStore,
@@ -160,6 +170,7 @@ export class SyncService {
             mime_type: mimeForMedia(remote.fields),
             album_id: albumId,
             source_url: isVideo ? ((remote.fields.url as string | null) ?? null) : null,
+            remote_url: matchableUrl(remote.fields),
           });
           await this.link(type, localId, remote);
         } else {
@@ -177,7 +188,8 @@ export class SyncService {
             await this.store.relinkMedia(
               existing.local_id,
               albumId,
-              (remote.fields.size_bytes as number | null) ?? null
+              (remote.fields.size_bytes as number | null) ?? null,
+              matchableUrl(remote.fields)
             );
             await this.link(type, existing.local_id, remote);
             summary.updated++;

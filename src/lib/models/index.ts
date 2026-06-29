@@ -46,6 +46,7 @@ export interface Album {
   name: string;
   description: string | null;
   cover_media_id: number | null;
+  cover_image: string | null; // explicit cover URL synced from the web (matches a media remote_url)
   date_from: string | null;
   date_to: string | null;
   created_at: string;
@@ -76,6 +77,7 @@ export interface Media {
   import_source: string | null;
   import_hash: string | null;
   source_url: string | null; // video media: external embed URL (e.g. YouTube)
+  remote_url: string | null; // the web-side URL this media was synced from (for cover matching)
   created_at: string;
   updated_at: string;
 }

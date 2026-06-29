@@ -322,6 +322,13 @@ ALTER TABLE media DROP COLUMN synced_at;
     "0003_media_source_url",
     `ALTER TABLE media ADD COLUMN source_url TEXT`,
   ],
+  [
+    "0004_album_cover_and_media_url",
+    `
+ALTER TABLE albums ADD COLUMN cover_image TEXT;
+ALTER TABLE media ADD COLUMN remote_url TEXT;
+`,
+  ],
 ];
 
 // Helper to convert a local file path to a Tauri asset URL for display

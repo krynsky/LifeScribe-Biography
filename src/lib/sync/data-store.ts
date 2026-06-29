@@ -72,23 +72,28 @@ export class SqlDataStore implements DataStore {
     mime_type: string;
     album_id: number | null;
     source_url: string | null;
+    remote_url: string | null;
   }): Promise<number> {
     const res = await execute(
       `INSERT INTO media
-         (file_path, thumbnail_path, filename, caption, file_size, mime_type, album_id, source_url, import_source, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,'sync',datetime('now'),datetime('now'))`,
-      [row.file_path, row.thumbnail_path, row.filename, row.caption, row.file_size, row.mime_type, row.album_id, row.source_url]
+         (file_path, thumbnail_path, filename, caption, file_size, mime_type, album_id, source_url, remote_url, import_source, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,'sync',datetime('now'),datetime('now'))`,
+      [row.file_path, row.thumbnail_path, row.filename, row.caption, row.file_size, row.mime_type, row.album_id, row.source_url, row.remote_url]
     );
     return res.lastInsertId;
   }
 
-  async relinkMedia(localId: number, album_id: number | null, file_size: number | null): Promise<void> {
+  async relinkMedia(
+    localId: number,
+    album_id: number | null,
+    file_size: number | null,
+    remote_url: string | null
+  ): Promise<void> {
     // Intentionally does NOT bump updated_at — media is never locally edited.
-    await execute(`UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size) WHERE id = ?`, [
-      album_id,
-      file_size,
-      localId,
-    ]);
+    await execute(
+      `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
+      [album_id, file_size, remote_url, localId]
+    );
   }
 
   async listSyncState(type: EntityType): Promise<SyncState[]> {

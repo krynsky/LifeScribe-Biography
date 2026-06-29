@@ -53,9 +53,15 @@ export interface DataStore {
     mime_type: string;
     album_id: number | null;
     source_url: string | null;
+    remote_url: string | null;
   }): Promise<number>;
-  /** Repair an existing media row's album link + size without re-downloading or bumping updated_at. */
-  relinkMedia(localId: number, album_id: number | null, file_size: number | null): Promise<void>;
+  /** Repair an existing media row's album link + size + remote_url without re-downloading or bumping updated_at. */
+  relinkMedia(
+    localId: number,
+    album_id: number | null,
+    file_size: number | null,
+    remote_url: string | null
+  ): Promise<void>;
 
   listSyncState(type: EntityType): Promise<SyncState[]>;
   getSyncState(type: EntityType, localId: number): Promise<SyncState | null>;

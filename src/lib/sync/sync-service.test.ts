@@ -19,14 +19,14 @@ class FakeStore implements DataStore {
     if (r) r.fields = fields;
   }
   async deleteLocal(t: EntityType, id: number) { this.local[t] = (this.local[t] ?? []).filter((r) => r.local_id !== id); }
-  async insertSyncedMedia(row: { file_path: string; thumbnail_path: string; filename: string; caption: string | null; file_size: number | null; mime_type: string; album_id: number | null; source_url: string | null }) {
+  async insertSyncedMedia(row: { file_path: string; thumbnail_path: string; filename: string; caption: string | null; file_size: number | null; mime_type: string; album_id: number | null; source_url: string | null; remote_url: string | null }) {
     const id = this.nextId++;
     (this.local.media ??= []).push({ local_id: id, updated_at: "2026-01-01T00:00:00.000Z", fields: { ...row } });
     return id;
   }
-  async relinkMedia(localId: number, album_id: number | null, file_size: number | null) {
+  async relinkMedia(localId: number, album_id: number | null, file_size: number | null, remote_url: string | null) {
     const r = (this.local.media ?? []).find((x) => x.local_id === localId);
-    if (r) { r.fields.album_id = album_id; if (file_size != null) r.fields.file_size = file_size; }
+    if (r) { r.fields.album_id = album_id; if (file_size != null) r.fields.file_size = file_size; if (remote_url != null) r.fields.remote_url = remote_url; }
   }
   async listSyncState(t: EntityType) { return this.state[t] ?? []; }
   async getSyncState(t: EntityType, id: number) { return (this.state[t] ?? []).find((s) => s.local_id === id) ?? null; }
