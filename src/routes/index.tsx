@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/react-router";
+import { createRouter, createRoute, createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import AppShell from "@/components/layout/AppShell";
 
 // Pages
@@ -18,13 +18,38 @@ import ArchiveImportPage from "@/pages/import/ArchiveImportPage";
 import ReviewPage from "@/pages/import/ReviewPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
 
-// Root route — wraps everything in AppShell
-const rootRoute = createRootRoute({
-  component: () => (
+// Reader pages
+import ReaderShell from "@/pages/reader/ReaderShell";
+import ReaderCoverPage from "@/pages/reader/ReaderCoverPage";
+import ReaderStoriesPage from "@/pages/reader/ReaderStoriesPage";
+import ReaderStoryPage from "@/pages/reader/ReaderStoryPage";
+import ReaderTimelinePage from "@/pages/reader/ReaderTimelinePage";
+import ReaderGalleryPage from "@/pages/reader/ReaderGalleryPage";
+import ReaderAlbumPage from "@/pages/reader/ReaderAlbumPage";
+import ReaderFamilyTreePage from "@/pages/reader/ReaderFamilyTreePage";
+import ReaderCareerPage from "@/pages/reader/ReaderCareerPage";
+import ReaderMapsPage from "@/pages/reader/ReaderMapsPage";
+
+// Root route — wraps editor routes in AppShell; Reader Mode routes render
+// full-screen with their own chrome (ReaderShell), so the root component
+// switches based on the current path.
+function RootComponent() {
+  const routerState = useRouterState();
+  const isReader = routerState.location.pathname.startsWith("/reader");
+
+  if (isReader) {
+    return <Outlet />;
+  }
+
+  return (
     <AppShell>
       <Outlet />
     </AppShell>
-  ),
+  );
+}
+
+const rootRoute = createRootRoute({
+  component: RootComponent,
 });
 
 const overviewRoute = createRoute({
@@ -119,6 +144,72 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+// Reader Mode — full-screen read-only presentation. readerRoute owns the
+// persistent sidebar (via ReaderShell); every section below is a child so
+// they share it through a single <Outlet/>.
+const readerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/reader",
+  component: ReaderShell,
+});
+const readerCoverRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/",
+  component: ReaderCoverPage,
+});
+const readerStoriesRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/stories",
+  component: ReaderStoriesPage,
+});
+const readerStoryRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/stories/$storyId",
+  component: ReaderStoryPage,
+});
+const readerTimelineRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/timeline",
+  component: ReaderTimelinePage,
+});
+const readerGalleryRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/gallery",
+  component: ReaderGalleryPage,
+});
+const readerAlbumRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/gallery/albums/$albumId",
+  component: ReaderAlbumPage,
+});
+const readerFamilyTreeRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/family-tree",
+  component: ReaderFamilyTreePage,
+});
+const readerCareerRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/career",
+  component: ReaderCareerPage,
+});
+const readerMapsRoute = createRoute({
+  getParentRoute: () => readerRoute,
+  path: "/maps",
+  component: ReaderMapsPage,
+});
+
+const readerRouteWithChildren = readerRoute.addChildren([
+  readerCoverRoute,
+  readerStoriesRoute,
+  readerStoryRoute,
+  readerTimelineRoute,
+  readerGalleryRoute,
+  readerAlbumRoute,
+  readerFamilyTreeRoute,
+  readerCareerRoute,
+  readerMapsRoute,
+]);
+
 const routeTree = rootRoute.addChildren([
   overviewRoute,
   storiesRoute,
@@ -135,6 +226,7 @@ const routeTree = rootRoute.addChildren([
   archiveImportRoute,
   reviewRoute,
   settingsRoute,
+  readerRouteWithChildren,
 ]);
 
 export const router = createRouter({ routeTree });

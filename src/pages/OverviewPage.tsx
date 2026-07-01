@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Clock, Image, Users, Briefcase, MapPin, Download } from "lucide-react";
+import { BookOpen, Clock, Image, Users, Briefcase, MapPin, Download, Eye } from "lucide-react";
 import { getBiographyStats } from "@/lib/actions/biography";
 
 interface Stats {
@@ -51,6 +51,32 @@ export default function OverviewPage() {
           Everything that makes you, you — captured and preserved.
         </p>
       </div>
+
+      {/* Reader Mode entry point */}
+      <Link
+        to="/reader"
+        className="flex items-center gap-4 p-6 rounded-xl border mb-8 transition-shadow hover:shadow-md"
+        style={{
+          background: "var(--color-surface)",
+          borderColor: "var(--color-primary)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        <div
+          className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: "var(--color-primary)" }}
+        >
+          <Eye size={20} color="white" />
+        </div>
+        <div>
+          <div className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+            Read My Biography
+          </div>
+          <div className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            See your life story the way a visitor would experience it
+          </div>
+        </div>
+      </Link>
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
