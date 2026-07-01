@@ -1,0 +1,54 @@
+<h2>How should you navigate between sections inside Reader Mode?</h2>
+<p class="subtitle">Sections: Overview/Cover, Stories, Timeline, Gallery, Family Tree, Career, Maps</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Persistent left sidebar (like a book's TOC)</h3>
+      <p>A slim table-of-contents sidebar stays visible on the left the whole time you're in Reader Mode, listing all sections. Click any to jump. Familiar, always-available navigation.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px">
+            <div class="mock-sidebar" style="min-height:110px;font-size:12px">Cover<br><b>Stories</b><br>Timeline<br>Gallery<br>Family<br>Career<br>Maps</div>
+            <div class="mock-content" style="flex:1"><div class="placeholder" style="height:100px">Section content</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Top tab bar</h3>
+      <p>Sections shown as tabs across the top, like chapters of a book laid flat. More horizontal space for content since there's no sidebar; feels more like a document/magazine than an app.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body">
+          <div class="mock-nav">Cover | <b>Stories</b> | Timeline | Gallery | Family | Career | Maps</div>
+          <div class="placeholder" style="height:100px;margin-top:8px">Section content</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Cover page with chapter tiles, then back-and-forth</h3>
+      <p>Landing on Reader Mode shows a cover page with big tappable tiles per section (no persistent nav). Inside a section, small "&larr; Back to Cover" + prev/next chapter arrows are the only navigation &mdash; most book-like, but slower to jump between distant sections.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body">
+          <div class="placeholder" style="height:40px">Title / hero</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div class="placeholder" style="flex:1;height:50px">Stories</div>
+            <div class="placeholder" style="flex:1;height:50px">Timeline</div>
+            <div class="placeholder" style="flex:1;height:50px">Gallery</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">My recommendation: <b>A &mdash; persistent left sidebar</b>. It's the least risky choice: familiar, keeps every section one click away, and works well at any window size. C is the most "book-like" but adds friction jumping between sections (e.g. Stories &rarr; Maps), and B trades away vertical chrome for not much benefit here.</p>

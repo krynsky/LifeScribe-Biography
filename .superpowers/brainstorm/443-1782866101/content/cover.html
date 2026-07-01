@@ -1,0 +1,52 @@
+<h2>What should the Reader Mode cover page feel like?</h2>
+<p class="subtitle">This is the first thing you see when entering Reader Mode &mdash; before picking a section from the sidebar.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Editorial / book cover</h3>
+      <p>Full-bleed hero photo (avatar or a favorite image) behind the title and tagline, large elegant serif typography, like the cover of a memoir. Quiet, emotional, minimal chrome.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body" style="background:linear-gradient(135deg,#2b2620,#4a4038);color:#f5f0e8;padding:32px;text-align:center;border-radius:8px">
+          <div style="font-size:22px;font-family:Georgia,serif;letter-spacing:1px">My Life Story</div>
+          <div style="font-size:12px;margin-top:6px;opacity:0.8">A collection of memories, 1978&ndash;present</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Highlights dashboard</h3>
+      <p>Title + tagline up top, then a grid of "highlight" cards below &mdash; featured story, recent milestone, a photo, a map preview &mdash; each clickable to jump straight into that section. More functional, less ceremonial.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body">
+          <div class="placeholder" style="height:30px">My Life Story</div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <div class="placeholder" style="flex:1;height:50px;font-size:10px">Featured story</div>
+            <div class="placeholder" style="flex:1;height:50px;font-size:10px">Latest photo</div>
+            <div class="placeholder" style="flex:1;height:50px;font-size:10px">Timeline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Timeline-first</h3>
+      <p>No separate "cover" &mdash; entering Reader Mode drops you straight into the Timeline section (most recent or earliest milestone), title shown small at the top. Reading starts immediately rather than pausing on a title screen.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-body">
+          <div class="mock-nav" style="font-size:11px">My Life Story</div>
+          <div class="placeholder" style="height:70px;margin-top:8px">Timeline entries begin immediately</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">My recommendation: <b>A &mdash; editorial/book cover</b>. A biography app's whole emotional value is "this feels like a real story about my life," and a quiet, photo-forward cover sells that in the first second. B is more useful as a utility dashboard (which the existing Overview page already covers), and C skips the moment entirely.</p>
