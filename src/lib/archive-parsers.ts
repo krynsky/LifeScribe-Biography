@@ -30,38 +30,38 @@ export async function detectPlatform(extractedPath: string): Promise<Platform> {
 // ── Simple CSV parser ─────────────────────────────────────────────────────
 
 function parseCSV(text: string): Array<Record<string, string>> {
-  const lines = text.split(/\r?\n/);
-  if (lines.length < 2) return [];
-
-  function parseLine(line: string): string[] {
-    const cols: string[] = [];
-    let cur = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
-        else { inQuotes = !inQuotes; }
-      } else if (ch === "," && !inQuotes) {
-        cols.push(cur.trim()); cur = "";
-      } else {
-        cur += ch;
-      }
+  // Character-by-character parse so newlines inside quoted fields (common in
+  // LinkedIn description/summary columns) don't split a record in two.
+  const records: string[][] = [];
+  let cols: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === "," && !inQuotes) {
+      cols.push(cur.trim()); cur = "";
+    } else if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      cols.push(cur.trim()); cur = "";
+      if (cols.some((c) => c !== "")) records.push(cols);
+      cols = [];
+    } else {
+      cur += ch;
     }
-    cols.push(cur.trim());
-    return cols;
   }
+  cols.push(cur.trim());
+  if (cols.some((c) => c !== "")) records.push(cols);
 
-  const headers = parseLine(lines[0]);
-  const rows: Array<Record<string, string>> = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const cols = parseLine(lines[i]);
+  if (records.length < 2) return [];
+  const headers = records[0];
+  return records.slice(1).map((rec) => {
     const row: Record<string, string> = {};
-    headers.forEach((h, idx) => { row[h.trim()] = cols[idx]?.trim() ?? ""; });
-    rows.push(row);
-  }
-  return rows;
+    headers.forEach((h, idx) => { row[h.trim()] = rec[idx]?.trim() ?? ""; });
+    return row;
+  });
 }
 
 // ── Timestamp helpers ─────────────────────────────────────────────────────

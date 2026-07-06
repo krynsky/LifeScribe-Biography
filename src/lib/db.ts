@@ -9,11 +9,17 @@ const MIGRATIONS_PATH = "sqlite:lifescribe.db";
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   if (_dbPromise) return _dbPromise;
-  _dbPromise = Database.load(MIGRATIONS_PATH).then(async (db) => {
-    await runMigrations(db);
-    _db = db;
-    return db;
-  });
+  _dbPromise = Database.load(MIGRATIONS_PATH)
+    .then(async (db) => {
+      await runMigrations(db);
+      _db = db;
+      return db;
+    })
+    .catch((err) => {
+      // Don't cache the failure — let the next caller retry the load.
+      _dbPromise = null;
+      throw err;
+    });
   return _dbPromise;
 }
 

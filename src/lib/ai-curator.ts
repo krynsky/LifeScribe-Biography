@@ -115,9 +115,12 @@ export async function curateText(
 
   onProgress?.("Parsing response…");
 
+  // The prompt forbids markdown fences, but strip them if present anyway.
+  const jsonText = raw.text.trim().replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
+
   let parsed: CuratedResult;
   try {
-    parsed = JSON.parse(raw.text) as CuratedResult;
+    parsed = JSON.parse(jsonText) as CuratedResult;
   } catch {
     throw new Error(`Failed to parse Claude response as JSON: ${raw.text.substring(0, 200)}`);
   }

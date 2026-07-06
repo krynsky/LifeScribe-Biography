@@ -60,6 +60,17 @@ interface StoryEditorProps {
   readOnly?: boolean;
 }
 
+// Malformed content (e.g. legacy or externally synced data) must not crash
+// the whole editor page — fall back to an empty document.
+function safeParseDoc(content: string): object | null {
+  try {
+    return JSON.parse(content) as object;
+  } catch {
+    console.error("StoryEditor: could not parse story content as JSON");
+    return null;
+  }
+}
+
 const EXTENSIONS = [
   Document,
   Paragraph,
@@ -116,7 +127,7 @@ export default function StoryEditor({
       ...EXTENSIONS,
       Placeholder.configure({ placeholder }),
     ],
-    content: content ? (JSON.parse(content) as object) : null,
+    content: content ? safeParseDoc(content) : null,
     editable: !readOnly,
     onUpdate({ editor }) {
       onChangeRef.current(JSON.stringify(editor.getJSON()));
@@ -128,7 +139,8 @@ export default function StoryEditor({
     if (!editor || !content) return;
     const current = JSON.stringify(editor.getJSON());
     if (current !== content) {
-      editor.commands.setContent(JSON.parse(content) as object, false);
+      const doc = safeParseDoc(content);
+      if (doc) editor.commands.setContent(doc, false);
     }
   }, [content, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 

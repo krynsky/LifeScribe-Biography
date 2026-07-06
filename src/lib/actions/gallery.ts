@@ -159,6 +159,14 @@ export async function insertMedia(data: {
       data.import_hash ?? null,
     ]
   );
+  // INSERT OR IGNORE: a duplicate import_hash inserts nothing, and lastInsertId
+  // then points at an unrelated earlier row — return the existing media instead.
+  if (result.rowsAffected === 0 && data.import_hash) {
+    const existing = await query<Media>("SELECT * FROM media WHERE import_hash = ?", [
+      data.import_hash,
+    ]);
+    return existing[0]!;
+  }
   return (await getMedia(result.lastInsertId))!;
 }
 
@@ -168,7 +176,7 @@ export async function updateMedia(
 ): Promise<Media> {
   const fields = Object.keys(data) as (keyof typeof data)[];
   if (fields.length === 0) return (await getMedia(id))!;
-  const setClauses = fields.map((f) => (f === "is_favorite" ? `${f} = ?` : `${f} = ?`)).join(", ");
+  const setClauses = fields.map((f) => `${f} = ?`).join(", ");
   const values = fields.map((f) => (f === "is_favorite" ? (data[f] ? 1 : 0) : data[f]));
   await execute(
     `UPDATE media SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`,

@@ -74,11 +74,13 @@ export async function createStory(input: CreateStoryInput): Promise<Story> {
 
 export async function updateStory(input: UpdateStoryInput): Promise<Story> {
   const { id, ...data } = input;
-  const fields = Object.keys(data) as (keyof typeof data)[];
+  const patch: Record<string, unknown> = { ...data };
+  if (data.title !== undefined) patch.slug = slugify(data.title);
+  const fields = Object.keys(patch);
   if (fields.length === 0) return (await getStory(id))!;
 
   const setClauses = fields.map((f) => `${f} = ?`).join(", ");
-  const values = fields.map((f) => data[f]);
+  const values = fields.map((f) => patch[f]);
 
   await execute(
     `UPDATE stories SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`,

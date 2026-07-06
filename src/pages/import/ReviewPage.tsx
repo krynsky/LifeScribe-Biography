@@ -8,6 +8,7 @@ import { listImportItems, updateImportItemStatus } from "@/lib/actions/import";
 import { createStory } from "@/lib/actions/stories";
 import { createMilestone } from "@/lib/actions/milestones";
 import { createCareerEntry } from "@/lib/actions/career";
+import { createMapPin } from "@/lib/actions/map-pins";
 import { curateText, getApiKey } from "@/lib/ai-curator";
 import type {
   ImportItem, ImportItemType,
@@ -116,6 +117,16 @@ async function acceptItem(item: ImportItem): Promise<void> {
       end_date: c.end_date ?? undefined,
       is_current: c.is_current ?? false,
       location: c.location ?? undefined,
+    });
+  } else if (item.item_type === "map_pin") {
+    const c = parseContent<ImportMapPinContent>(item);
+    await createMapPin({
+      name: c.name ?? "Unnamed place",
+      description: c.description ?? undefined,
+      latitude: c.latitude ?? 0,
+      longitude: c.longitude ?? 0,
+      address: c.address ?? undefined,
+      visit_date: c.visit_date ?? undefined,
     });
   }
   await updateImportItemStatus(item.id, "accepted");

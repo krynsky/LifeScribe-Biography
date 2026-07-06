@@ -1,6 +1,19 @@
 import { useEffect, useRef } from "react";
 import type { MapPin } from "@/lib/models";
 
+// Pin names/descriptions are user text and go into popup HTML — escape them.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function popupHtml(pin: MapPin): string {
+  return `<strong>${escapeHtml(pin.name)}</strong>${pin.description ? `<br>${escapeHtml(pin.description)}` : ""}`;
+}
+
 interface MapViewProps {
   pins: MapPin[];
   onPinClick?: (pin: MapPin) => void;
@@ -54,7 +67,7 @@ export default function MapView({ pins, onPinClick, onMapClick, height = "500px"
       pins.forEach((pin) => {
         const marker = L.marker([pin.latitude, pin.longitude])
           .addTo(map)
-          .bindPopup(`<strong>${pin.name}</strong>${pin.description ? `<br>${pin.description}` : ""}`);
+          .bindPopup(popupHtml(pin));
         marker.on("click", () => onPinClickRef.current?.(pin));
       });
 
@@ -86,9 +99,7 @@ export default function MapView({ pins, onPinClick, onMapClick, height = "500px"
         if (layer instanceof L.Marker) map.removeLayer(layer);
       });
       pins.forEach((pin) => {
-        const marker = L.marker([pin.latitude, pin.longitude]).bindPopup(
-          `<strong>${pin.name}</strong>${pin.description ? `<br>${pin.description}` : ""}`
-        );
+        const marker = L.marker([pin.latitude, pin.longitude]).bindPopup(popupHtml(pin));
         map.addLayer(marker);
         if (onPinClick) marker.on("click", () => onPinClick(pin));
       });
