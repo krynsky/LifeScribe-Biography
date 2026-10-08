@@ -31,9 +31,9 @@ async function api<T>(method: string, path: string, body?: unknown, _retries = 1
   return json.data;
 }
 
-/** Arrays (e.g. tag names) are stored as JSON text in a single column. */
+/** Arrays/objects (tags, linked entries…) are stored as JSON text in a single column. */
 function normalizeExtra(v: unknown): unknown {
-  return Array.isArray(v) ? JSON.stringify(v) : (v ?? null);
+  return v !== null && typeof v === "object" ? JSON.stringify(v) : (v ?? null);
 }
 
 /** Stable short hash used to name downloaded image files after their source URL. */

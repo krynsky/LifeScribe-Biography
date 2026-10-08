@@ -28,6 +28,8 @@ export interface Story {
   category_color?: string | null;
   category_icon?: string | null;
   tags?: string | null; // JSON array of tag names
+  author_name?: string | null;
+  related?: string | null; // JSON {milestones, albums, map_pins, career}
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -45,6 +47,10 @@ export interface Milestone {
   // Web-owned display fields mirrored by sync (category is the column above)
   category_color?: string | null;
   category_icon?: string | null;
+  end_date?: string | null;
+  end_date_precision?: string | null;
+  linked_stories?: string | null; // JSON [{remote_id,title}]
+  position?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +68,7 @@ export interface Album {
   category_color?: string | null;
   category_icon?: string | null;
   tags?: string | null; // JSON array of tag names
+  position?: number | null;
   created_at: string;
   updated_at: string;
   // Joined count
@@ -131,6 +138,8 @@ export interface CareerEntry {
   location: string | null;
   logo_path: string | null;
   employment_type?: string | null;
+  linked_albums?: string | null; // JSON [{remote_id,title}]
+  linked_stories?: string | null; // JSON [{remote_id,title}]
   // Web-owned display fields mirrored by sync
   category?: string | null;
   category_color?: string | null;
@@ -150,6 +159,9 @@ export interface MapPin {
   pin_type: "place" | "home" | "work" | "travel" | "memory";
   color: string;
   image_path?: string | null;
+  linked_albums?: string | null; // JSON [{remote_id,title}]
+  linked_stories?: string | null; // JSON [{remote_id,title}]
+  position?: number | null;
   // Web-owned display fields mirrored by sync
   category?: string | null;
   category_color?: string | null;

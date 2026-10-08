@@ -223,7 +223,7 @@ export default function FamilyTreeView() {
   const unconnected = members.filter((m) => !connected.has(m.id));
 
   return (
-    <ReadPage title="Family Tree" subtitle={subtitle}>
+    <ReadPage title="Family Tree" subtitle={subtitle} width="full">
       <div className="space-y-3">
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium" style={{ color: "var(--color-text)" }}>Center on:</label>

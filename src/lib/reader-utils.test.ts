@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate, parseTags, formatFamilyName } from "./reader-utils";
+import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate, parseTags, formatFamilyName, formatShortDate, formatMonthYear, computeDuration, parseLinked, parseRelated } from "./reader-utils";
 import type { Story } from "./models";
 
 describe("isBiographyEmpty", () => {
@@ -95,5 +95,33 @@ describe("formatFamilyName", () => {
     expect(formatFamilyName({ given_name: "Alicia", surname: "Krynsky", birth_surname: "Spika" })).toBe("Alicia Krynsky (née Spika)");
     expect(formatFamilyName({ given_name: "John", surname: "Doe", suffix: "Jr." })).toBe("John Doe, Jr.");
     expect(formatFamilyName({ given_name: "Mark", surname: null })).toBe("Mark");
+  });
+});
+
+describe("web date formats", () => {
+  it("treats an unset precision as year-only for story dates", () => {
+    expect(formatDisplayDate("2017-02-14T00:00:00.000Z", null)).toBe("2017");
+    expect(formatDisplayDate("2017-02-14T00:00:00.000Z", "day")).toBe("February 14, 2017");
+  });
+  it("formats milestone short dates", () => {
+    expect(formatShortDate("2026-06-12T00:00:00.000Z", "day")).toBe("Jun 12, 2026");
+    expect(formatShortDate("2026-06-01T00:00:00.000Z", "month")).toBe("Jun 2026");
+    expect(formatShortDate("2026-06-01T00:00:00.000Z", "year")).toBe("2026");
+  });
+  it("shows only the year for January career dates", () => {
+    expect(formatMonthYear("2022-01-01T00:00:00.000Z")).toBe("2022");
+    expect(formatMonthYear("2022-04-01T00:00:00.000Z")).toBe("Apr 2022");
+  });
+  it("computes career durations", () => {
+    expect(computeDuration("2020-01-01", "2022-04-01", false)).toBe("2 yrs 3 mo");
+    expect(computeDuration("2020-01-01", "2021-01-01", false)).toBe("1 yr");
+    expect(computeDuration("2020-01-01", "2020-01-20", false)).toBe("Less than a month");
+    expect(computeDuration("2020-01-01", null, true, new Date(Date.UTC(2020, 5, 1)))).toBe("5 mo");
+  });
+  it("parses linked refs and related defensively", () => {
+    expect(parseLinked('[{"remote_id":"a","title":"T"}]')).toEqual([{ remote_id: "a", title: "T" }]);
+    expect(parseLinked("bad")).toEqual([]);
+    expect(parseRelated(null).albums).toEqual([]);
+    expect(parseRelated('{"albums":[{"title":"A"}]}').albums).toEqual([{ title: "A" }]);
   });
 });

@@ -171,6 +171,11 @@ export default function StoryEditor({
 
   if (!editor) return null;
 
+  // Read mode: plain prose like the public site — no card frame, scroll area, or word counts.
+  if (readOnly) {
+    return <EditorContent editor={editor} className="tiptap" />;
+  }
+
   return (
     <div
       className="flex flex-col rounded-xl border overflow-hidden"

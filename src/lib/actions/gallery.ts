@@ -10,7 +10,7 @@ export async function listAlbums(): Promise<(Album & { media_count: number; cove
        FROM albums a
        LEFT JOIN media m ON m.album_id = a.id
        GROUP BY a.id
-       ORDER BY a.created_at DESC`
+       ORDER BY COALESCE(a.position, 1000000), a.created_at DESC`
   );
 
   // 2) Resolve each album's cover with a plain parameterized query. This avoids

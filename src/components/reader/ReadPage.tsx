@@ -3,18 +3,25 @@ import type { ReactNode } from "react";
 interface ReadPageProps {
   title?: string;
   subtitle?: string;
-  /** "narrow" for long-form reading, "wide" for card grids. */
-  width?: "narrow" | "wide";
+  /** Widths follow the public site: story prose is narrow, timeline/career medium, galleries full. */
+  width?: "narrow" | "timeline" | "wide" | "full";
   children: ReactNode;
 }
+
+const WIDTHS = {
+  narrow: "max-w-2xl",
+  timeline: "max-w-4xl",
+  wide: "max-w-5xl",
+  full: "max-w-6xl",
+} as const;
 
 /** Shared page frame for read-mode views, mirroring the lifescribe.us public bio layout. */
 export default function ReadPage({ title, subtitle, width = "wide", children }: ReadPageProps) {
   return (
-    <div className={`mx-auto px-8 py-10 ${width === "narrow" ? "max-w-3xl" : "max-w-5xl"}`}>
+    <div className={`mx-auto px-6 py-10 ${WIDTHS[width]}`}>
       {title && (
         <header className="mb-8">
-          <h1 className="text-3xl" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
             {title}
           </h1>
           {subtitle && (

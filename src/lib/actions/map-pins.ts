@@ -2,7 +2,7 @@ import { query, execute } from "../db";
 import type { MapPin } from "../models";
 
 export async function listMapPins(): Promise<MapPin[]> {
-  return query<MapPin>("SELECT * FROM map_pins ORDER BY COALESCE(visit_date, created_at) DESC");
+  return query<MapPin>("SELECT * FROM map_pins ORDER BY COALESCE(position, 1000000), COALESCE(visit_date, created_at) DESC");
 }
 
 export async function getMapPin(id: number): Promise<MapPin | null> {

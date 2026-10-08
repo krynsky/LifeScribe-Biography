@@ -45,13 +45,17 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "biography",
     singleton: true,
     columns: ["title", "tagline", "bio"],
+    images: [
+      { remoteField: "banner_image_url", pathColumn: "cover_photo_path" },
+      { remoteField: "profile_image_url", pathColumn: "avatar_photo_path" },
+    ],
   },
   {
     type: "story",
     table: "stories",
     remoteKey: "stories",
     columns: ["title", "slug", "content", "excerpt", "status", "event_date", "event_date_precision"],
-    extraColumns: [...CATEGORY_COLUMNS, "tags"],
+    extraColumns: [...CATEGORY_COLUMNS, "tags", "author_name", "related"],
     images: [{ remoteField: "featured_image_url", pathColumn: "featured_image_path" }],
   },
   {
@@ -60,7 +64,7 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "milestones",
     columns: ["title", "description", "date", "date_precision"],
     // milestones already have a local `category` column
-    extraColumns: ["category", "category_color", "category_icon"],
+    extraColumns: ["category", "category_color", "category_icon", "end_date", "end_date_precision", "linked_stories", "position"],
     images: [{ remoteField: "image_url", pathColumn: "image_path" }],
   },
   {
@@ -68,7 +72,7 @@ export const ENTITIES: EntityDef[] = [
     table: "career_entries",
     remoteKey: "career",
     columns: ["organization", "title", "description", "start_date", "end_date", "is_current", "location"],
-    extraColumns: ["employment_type", ...CATEGORY_COLUMNS],
+    extraColumns: ["employment_type", ...CATEGORY_COLUMNS, "linked_albums", "linked_stories"],
     images: [{ remoteField: "logo_url", pathColumn: "logo_path" }],
   },
   {
@@ -76,7 +80,7 @@ export const ENTITIES: EntityDef[] = [
     table: "map_pins",
     remoteKey: "map_pins",
     columns: ["name", "description", "latitude", "longitude"],
-    extraColumns: CATEGORY_COLUMNS,
+    extraColumns: [...CATEGORY_COLUMNS, "linked_albums", "linked_stories", "position"],
     images: [{ remoteField: "image_url", pathColumn: "image_path" }],
   },
   {
@@ -92,7 +96,7 @@ export const ENTITIES: EntityDef[] = [
     table: "albums",
     remoteKey: "albums",
     columns: ["name", "description", "cover_image"],
-    extraColumns: [...CATEGORY_COLUMNS, "tags"],
+    extraColumns: [...CATEGORY_COLUMNS, "tags", "position"],
   },
   {
     type: "media",

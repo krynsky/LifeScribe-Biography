@@ -1,108 +1,117 @@
 import { useEffect, useState } from "react";
-import { Briefcase, GraduationCap, MapPin } from "lucide-react";
-import EmptyState from "@/components/ui/EmptyState";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
+import CategoryChip from "@/components/reader/CategoryChip";
+import { AlbumChips, StoryChips, useLinkTargets } from "@/components/reader/LinkedChips";
+import { getBiography } from "@/lib/actions/biography";
 import { listCareerEntries } from "@/lib/actions/career";
 import { imageSrc } from "@/lib/image-src";
-import CategoryChip from "@/components/reader/CategoryChip";
+import { computeDuration, formatMonthYear, parseLinked } from "@/lib/reader-utils";
 import type { CareerEntry } from "@/lib/models";
-
-function formatMonth(date: string | null): string {
-  if (!date) return "";
-  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const month = Number(date.substring(5, 7));
-  const year = date.substring(0, 4);
-  return month >= 1 && month <= 12 ? `${names[month - 1]} ${year}` : year;
-}
-
-function dateRange(e: CareerEntry): string {
-  const start = formatMonth(e.start_date);
-  const end = e.is_current ? "Present" : formatMonth(e.end_date);
-  return [start, end].filter(Boolean).join(" – ");
-}
 
 export default function CareerView() {
   const [entries, setEntries] = useState<CareerEntry[]>([]);
+  const [siteTitle, setSiteTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const links = useLinkTargets();
 
   useEffect(() => {
-    listCareerEntries().then(setEntries).catch(console.error).finally(() => setLoading(false));
+    Promise.all([listCareerEntries(), getBiography()])
+      .then(([e, b]) => {
+        setEntries(e);
+        setSiteTitle(b?.title ?? "");
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <ReadLoading />;
 
   return (
-    <ReadPage title="Career" subtitle="Professional history" width="narrow">
+    <ReadPage title="Career" subtitle={siteTitle ? `Professional history of ${siteTitle}` : "Professional history"} width="timeline">
       {entries.length === 0 ? (
-        <EmptyState
-          icon={<Briefcase size={24} style={{ color: "var(--color-text-muted)" }} />}
-          title="No career entries yet"
-          description="Career and education entries will appear here once added."
-        />
+        <div className="rounded-xl border border-dashed py-20 text-center" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
+          <p className="text-4xl">💼</p>
+          <p className="mt-3">No career history has been added yet.</p>
+        </div>
       ) : (
-        <div className="relative pl-8">
-          <div className="absolute left-1.5 top-2 bottom-0 w-0.5" style={{ background: "var(--color-border)" }} />
-          <div className="space-y-6">
+        <div className="relative">
+          <div className="absolute bottom-2 left-5 top-2 w-px" style={{ background: "var(--color-border)" }} aria-hidden />
+          <div className="space-y-8">
             {entries.map((entry) => {
               const logo = imageSrc(entry.logo_path);
-              const Icon = entry.entry_type === "education" ? GraduationCap : Briefcase;
-              const lines = (entry.description ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+              const range = `${formatMonthYear(entry.start_date)} – ${
+                entry.is_current ? "Present" : entry.end_date ? formatMonthYear(entry.end_date) : "?"
+              }`;
+              const duration = computeDuration(entry.start_date, entry.end_date, !!entry.is_current);
               return (
-                <article
-                  key={entry.id}
-                  className="relative rounded-xl border overflow-hidden"
-                  style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", boxShadow: "var(--shadow-card)" }}
-                >
-                  <span
-                    className="absolute -left-[30px] top-5 w-3 h-3 rounded-full"
-                    style={{ background: "var(--color-accent)" }}
-                  />
-                  {logo && (
-                    <div className="flex justify-center py-5" style={{ background: "var(--color-surface-2)" }}>
-                      <img src={logo} alt={entry.organization} className="h-16 object-contain" loading="lazy" />
+                <div key={entry.id} className="relative flex gap-5">
+                  {logo ? (
+                    <div className="relative z-10 ml-4 mt-4 h-3 w-3 shrink-0 rounded-full" style={{ background: "var(--color-accent)" }} />
+                  ) : (
+                    <div
+                      className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold shadow-sm ring-2"
+                      style={{ background: "#fff", color: "var(--color-primary)", ["--tw-ring-color" as string]: "rgba(212,168,106,0.3)" }}
+                    >
+                      {entry.organization.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <div className="p-5">
-                    <div className="flex items-start gap-2 flex-wrap">
-                      {!logo && <Icon size={16} className="mt-1" style={{ color: "var(--color-text-muted)" }} />}
-                      <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
-                        {entry.title || (entry.entry_type === "education" ? "Student" : "Employee")}
-                      </h3>
-                      {entry.is_current && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full mt-1" style={{ background: "#4A9B6F22", color: "var(--color-success)" }}>
-                          Current
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>
-                      {entry.organization}
-                      {entry.employment_type && (
-                        <span style={{ color: "var(--color-text-muted)" }}> · {entry.employment_type}</span>
-                      )}
-                    </div>
-                    <div className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{dateRange(entry)}</div>
-                    {entry.category && (
-                      <div className="mt-2">
-                        <CategoryChip name={entry.category} color={entry.category_color} icon={entry.category_icon} />
+
+                  <div
+                    className="min-w-0 flex-1 overflow-hidden rounded-xl border"
+                    style={{ background: "var(--color-surface)", borderColor: "var(--color-border-light)", boxShadow: "var(--shadow-card)" }}
+                  >
+                    {logo && (
+                      <div className="flex items-center justify-center border-b p-6" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
+                        <img src={logo} alt={`${entry.organization} logo`} className="h-20 object-contain" style={{ maxWidth: 200 }} loading="lazy" />
                       </div>
                     )}
-                    {entry.location && (
-                      <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-                        <MapPin size={11} />
-                        {entry.location}
+                    <div className="p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-base font-semibold" style={{ color: "var(--color-text)" }}>
+                          {entry.title || (entry.entry_type === "education" ? "Student" : "Employee")}
+                        </h2>
+                        {!!entry.is_current && (
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "#f0fdf4", color: "#15803d", boxShadow: "inset 0 0 0 1px #bbf7d0" }}>
+                            Current
+                          </span>
+                        )}
+                        <CategoryChip variant="solid" name={entry.category} color={entry.category_color} icon={entry.category_icon} />
                       </div>
-                    )}
-                    {lines.length > 1 ? (
-                      <ul className="mt-3 text-sm space-y-1 list-disc pl-4" style={{ color: "var(--color-text-secondary)" }}>
-                        {lines.map((l, i) => (
-                          <li key={i}>{l.replace(/^[•\-*]\s*/, "")}</li>
-                        ))}
-                      </ul>
-                    ) : lines.length === 1 ? (
-                      <p className="mt-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>{lines[0]}</p>
-                    ) : null}
+
+                      <p className="mt-0.5 text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                        {entry.organization}
+                        {entry.employment_type && (
+                          <span className="ml-1.5 font-normal" style={{ color: "var(--color-text-muted)" }}>
+                            · {entry.employment_type}
+                          </span>
+                        )}
+                      </p>
+
+                      <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                        {range}
+                        {duration && (
+                          <>
+                            <span className="mx-1.5">·</span>
+                            {duration}
+                          </>
+                        )}
+                      </p>
+
+                      {entry.location && (
+                        <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-muted)" }}>📍 {entry.location}</p>
+                      )}
+
+                      {entry.description && (
+                        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                          {entry.description}
+                        </p>
+                      )}
+
+                      <AlbumChips refs={parseLinked(entry.linked_albums)} ids={links.albums} />
+                      <StoryChips refs={parseLinked(entry.linked_stories)} ids={links.stories} />
+                    </div>
                   </div>
-                </article>
+                </div>
               );
             })}
           </div>

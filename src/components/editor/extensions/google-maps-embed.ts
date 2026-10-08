@@ -1,6 +1,26 @@
 // src/components/editor/extensions/google-maps-embed.ts
 import { Node } from "@tiptap/core";
 
+/**
+ * The web stores Maps embeds as `maps/embed/v1/place?key=…&q=…`. That key is restricted to
+ * the website's HTTP referrer, so inside the desktop webview (origin tauri.localhost) Google
+ * refuses to render it. The keyless `maps.google.com/maps?q=…&output=embed` form shows the
+ * same place without a key, so rewrite to it for display (the stored content is untouched).
+ */
+export function keylessMapsSrc(src: string | null | undefined): string | null {
+  if (!src) return null;
+  try {
+    const url = new URL(src);
+    if (url.hostname.endsWith("google.com") && url.pathname.startsWith("/maps/embed/v1/")) {
+      const q = url.searchParams.get("q") ?? url.searchParams.get("center");
+      if (q) return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed`;
+    }
+  } catch {
+    /* not a URL — leave as is */
+  }
+  return src;
+}
+
 export interface GoogleMapsEmbedOptions {
   HTMLAttributes: Record<string, string>;
 }
@@ -42,7 +62,7 @@ export const GoogleMapsEmbed = Node.create<GoogleMapsEmbedOptions>({
       [
         "iframe",
         {
-          src: HTMLAttributes.src,
+          src: keylessMapsSrc(HTMLAttributes.src) ?? HTMLAttributes.src,
           width: HTMLAttributes.width,
           height: HTMLAttributes.height,
           frameborder: "0",

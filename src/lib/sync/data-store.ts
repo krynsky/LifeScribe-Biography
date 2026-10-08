@@ -27,7 +27,7 @@ export class SqlDataStore implements DataStore {
 
   async upsertLocal(type: EntityType, fields: Record<string, unknown>): Promise<number> {
     const def = entityDef(type);
-    const cols = writableColumns(def);
+    const cols = writableColumns(def).filter((c) => def.columns.includes(c) || c in fields);
     const values = cols.map((c) => fields[c] ?? null);
 
     if (def.singleton) {

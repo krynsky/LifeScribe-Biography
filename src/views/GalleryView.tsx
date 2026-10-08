@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Image } from "lucide-react";
-import EmptyState from "@/components/ui/EmptyState";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
+import CategoryChip from "@/components/reader/CategoryChip";
 import { listAlbums } from "@/lib/actions/gallery";
 import { imageSrc } from "@/lib/image-src";
-import { parseTags } from "@/lib/reader-utils";
-import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import type { Album } from "@/lib/models";
 
 type AlbumRow = Album & { media_count: number; cover_path: string | null };
@@ -22,70 +19,72 @@ export default function GalleryView() {
   if (loading) return <ReadLoading />;
 
   const total = albums.reduce((n, a) => n + a.media_count, 0);
+  const subtitle =
+    total === 0
+      ? "No photos have been added yet."
+      : `${total} ${total === 1 ? "photo" : "photos"} across ${albums.length} ${albums.length === 1 ? "album" : "albums"}`;
 
   return (
-    <ReadPage
-      title="Photo Gallery"
-      subtitle={`${total} ${total === 1 ? "photo" : "photos"} across ${albums.length} ${albums.length === 1 ? "album" : "albums"}`}
-    >
-      {albums.length === 0 ? (
-        <EmptyState
-          icon={<Image size={24} style={{ color: "var(--color-text-muted)" }} />}
-          title="No photos yet"
-          description="Photo albums will appear here once added."
-        />
-      ) : (
-        <>
-          <h2 className="text-base font-semibold mb-3" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+    <ReadPage title="Photo Gallery" subtitle={subtitle} width="full">
+      {total === 0 && (
+        <div className="rounded-lg border border-dashed p-16 text-center" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
+          <div className="text-5xl">📷</div>
+          <p className="mt-4">No photos have been shared yet.</p>
+        </div>
+      )}
+
+      {albums.length > 0 && (
+        <div>
+          <h2 className="mb-4 text-lg font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
             Albums
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {albums.map((album) => {
+              // Web uses the album's explicit cover image; locally that is the downloaded photo
+              // matching it (cover_path), else the remote cover URL.
               const cover = imageSrc(album.cover_path) ?? imageSrc(album.cover_image);
               return (
                 <Link
                   key={album.id}
                   to="/gallery/albums/$albumId"
                   params={{ albumId: String(album.id) }}
-                  className="block rounded-xl overflow-hidden border transition-shadow hover:shadow-md"
+                  className="group overflow-hidden rounded-xl border transition-shadow hover:shadow-md"
                   style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", boxShadow: "var(--shadow-card)" }}
                 >
-                  <div className="relative aspect-video flex items-center justify-center overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
+                  <div className="relative aspect-video w-full overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
                     {cover ? (
-                      <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <img src={cover} alt={album.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
                     ) : (
-                      <Image size={32} style={{ color: "var(--color-text-muted)" }} />
+                      <div className="flex h-full w-full items-center justify-center">
+                        <span className="text-4xl" style={{ opacity: 0.4 }}>🖼️</span>
+                      </div>
                     )}
-                    <span
-                      className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 rounded-full text-white"
-                      style={{ background: "rgba(0,0,0,0.55)" }}
-                    >
-                      {album.media_count}
-                    </span>
+                    {album.media_count > 0 && (
+                      <span className="absolute bottom-2 right-2 rounded-full px-2 py-0.5 text-xs text-white" style={{ background: "rgba(0,0,0,0.6)" }}>
+                        {album.media_count}
+                      </span>
+                    )}
                   </div>
                   <div className="p-3">
-                    <div className="mb-1.5">
-                      <CategoryChip name={album.category} color={album.category_color} icon={album.category_icon} />
-                    </div>
-                    <div className="font-semibold text-sm" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+                    {album.category && (
+                      <div className="mb-1.5">
+                        <CategoryChip variant="solid" name={album.category} color={album.category_color} icon={album.category_icon} />
+                      </div>
+                    )}
+                    <p className="font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
                       {album.name}
-                    </div>
+                    </p>
                     {album.description && (
-                      <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
+                      <p className="mt-0.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
                         {album.description}
                       </p>
-                    )}
-                    {parseTags(album.tags).length > 0 && (
-                      <div className="mt-2">
-                        <TagList tags={parseTags(album.tags)} />
-                      </div>
                     )}
                   </div>
                 </Link>
               );
             })}
           </div>
-        </>
+        </div>
       )}
     </ReadPage>
   );

@@ -398,6 +398,47 @@ UPDATE sync_state SET last_synced_remote_at = NULL
     AND EXISTS (SELECT 1 FROM albums t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
 `,
   ],
+  // Second parity pass: pre-resolved display data (author, related entries, thumbnails'
+  // linked stories/albums, end dates, ordering). Trailing UPDATEs force one more re-pull of
+  // clean rows. (No SQL comments inside the template: the runner drops chunks starting "--".)
+  [
+    "0006_web_parity_display",
+    `
+ALTER TABLE stories ADD COLUMN author_name TEXT;
+ALTER TABLE stories ADD COLUMN related TEXT;
+ALTER TABLE milestones ADD COLUMN end_date TEXT;
+ALTER TABLE milestones ADD COLUMN end_date_precision TEXT;
+ALTER TABLE milestones ADD COLUMN linked_stories TEXT;
+ALTER TABLE milestones ADD COLUMN position INTEGER;
+ALTER TABLE career_entries ADD COLUMN linked_albums TEXT;
+ALTER TABLE career_entries ADD COLUMN linked_stories TEXT;
+ALTER TABLE map_pins ADD COLUMN linked_albums TEXT;
+ALTER TABLE map_pins ADD COLUMN linked_stories TEXT;
+ALTER TABLE map_pins ADD COLUMN position INTEGER;
+ALTER TABLE albums ADD COLUMN position INTEGER;
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'story' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM stories x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'milestone' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM milestones x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'career' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM career_entries x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'map_pin' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM map_pins x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'family_member' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM family_members x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'album' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM albums x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'biography' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM biography x WHERE x.id = sync_state.local_id AND x.updated_at <= sync_state.last_synced_at);
+`,
+  ],
 ];
 
 // Helper to convert a local file path to a Tauri asset URL for display

@@ -44,10 +44,13 @@ export function firstImageFromContent(content: string | null): string | null {
 }
 
 /** Format a stored date at its precision, e.g. "2017-02" -> "February 2017". */
-export function formatDisplayDate(date: string | null, precision: "year" | "month" | "day" | string = "day"): string {
+export function formatDisplayDate(date: string | null, precision: "year" | "month" | "day" | string | null = "day"): string {
   if (!date) return "";
   const year = date.substring(0, 4);
-  if (precision === "year") return year;
+  // The web treats an unset precision as year-only; only an explicit day/month shows more.
+  const p = (precision ?? "").toLowerCase();
+  if (p !== "day" && p !== "month") return year;
+  precision = p;
   const month = Number(date.substring(5, 7));
   const names = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   if (!month || month > 12) return year;
@@ -78,4 +81,85 @@ export function formatFamilyName(m: {
   if (m.birth_surname && m.birth_surname !== m.surname) name += ` (née ${m.birth_surname})`;
   if (m.suffix) name += `, ${m.suffix}`;
   return name || "Unnamed";
+}
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Milestone date, short form like the public timeline: "Jun 12, 2026", "Jun 2026", "2026". */
+export function formatShortDate(date: string | null, precision: string | null = "day"): string {
+  if (!date) return "";
+  const year = date.substring(0, 4);
+  const p = (precision ?? "day").toLowerCase();
+  if (p === "year") return year;
+  const month = Number(date.substring(5, 7));
+  if (!month || month > 12) return year;
+  if (p === "month") return `${SHORT_MONTHS[month - 1]} ${year}`;
+  const day = Number(date.substring(8, 10));
+  return day ? `${SHORT_MONTHS[month - 1]} ${day}, ${year}` : `${SHORT_MONTHS[month - 1]} ${year}`;
+}
+
+/** Career date: "Mon YYYY", or just "YYYY" for January (the year-only default), like the web. */
+export function formatMonthYear(date: string | null): string {
+  if (!date) return "";
+  const year = date.substring(0, 4);
+  const month = Number(date.substring(5, 7));
+  if (!month || month === 1) return year;
+  return `${SHORT_MONTHS[month - 1]} ${year}`;
+}
+
+/** Career range duration, e.g. "2 yrs 3 mo", "Present", "Less than a month". */
+export function computeDuration(start: string | null, end: string | null, isCurrent: boolean, now: Date = new Date()): string {
+  if (!start) return "";
+  const sy = Number(start.substring(0, 4));
+  const sm = Number(start.substring(5, 7)) - 1;
+  const ey = end ? Number(end.substring(0, 4)) : now.getUTCFullYear();
+  const em = end ? Number(end.substring(5, 7)) - 1 : now.getUTCMonth();
+  const months = (ey - sy) * 12 + (em - sm);
+  if (months < 1) return isCurrent ? "Present" : "Less than a month";
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} yr${years > 1 ? "s" : ""}`);
+  if (rem > 0) parts.push(`${rem} mo`);
+  return parts.join(" ");
+}
+
+export interface LinkedRef {
+  remote_id?: string;
+  title: string;
+}
+
+/** Parse a synced JSON-array-of-refs column ([{remote_id,title}]) defensively. */
+export function parseLinked(raw: string | null | undefined): LinkedRef[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => x && typeof x.title === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export interface StoryRelated {
+  milestones: { title: string; year: number }[];
+  albums: LinkedRef[];
+  map_pins: { name: string }[];
+  career: { title: string; company: string }[];
+}
+
+/** Parse a story's synced "Related Entries" JSON into a fully-populated structure. */
+export function parseRelated(raw: string | null | undefined): StoryRelated {
+  const empty: StoryRelated = { milestones: [], albums: [], map_pins: [], career: [] };
+  if (!raw) return empty;
+  try {
+    const v = JSON.parse(raw);
+    return {
+      milestones: Array.isArray(v?.milestones) ? v.milestones : [],
+      albums: Array.isArray(v?.albums) ? v.albums : [],
+      map_pins: Array.isArray(v?.map_pins) ? v.map_pins : [],
+      career: Array.isArray(v?.career) ? v.career : [],
+    };
+  } catch {
+    return empty;
+  }
 }

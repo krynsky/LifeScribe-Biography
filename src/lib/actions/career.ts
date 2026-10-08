@@ -4,9 +4,7 @@ import type { CareerEntry } from "../models";
 export async function listCareerEntries(): Promise<CareerEntry[]> {
   return query<CareerEntry>(
     `SELECT * FROM career_entries
-     ORDER BY
-       CASE WHEN is_current = 1 THEN '9999-12' ELSE COALESCE(end_date, '0000') END DESC,
-       COALESCE(start_date, '0000') DESC`
+     ORDER BY is_current DESC, COALESCE(start_date, '0000') DESC`
   );
 }
 

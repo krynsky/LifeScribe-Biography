@@ -1,12 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { BookOpen } from "lucide-react";
 import { imageSrc } from "@/lib/image-src";
-import { firstImageFromContent, formatDisplayDate, parseTags } from "@/lib/reader-utils";
+import { formatDisplayDate, parseTags } from "@/lib/reader-utils";
 import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import type { Story } from "@/lib/models";
 
-export default function StoryCard({ story }: { story: Story }) {
-  const cover = imageSrc(story.featured_image_path) ?? imageSrc(firstImageFromContent(story.content));
+interface StoryCardProps {
+  story: Story;
+  /** The stories list shows a 📝 placeholder when there is no cover; the home page shows none. */
+  placeholder?: boolean;
+}
+
+export default function StoryCard({ story, placeholder = true }: StoryCardProps) {
+  // Cover comes only from the story's featured image (no guessing from body images),
+  // exactly like the public site.
+  const cover = imageSrc(story.featured_image_path);
   const date = formatDisplayDate(story.event_date, story.event_date_precision);
   const tags = parseTags(story.tags);
 
@@ -14,38 +21,40 @@ export default function StoryCard({ story }: { story: Story }) {
     <Link
       to="/stories/$storyId"
       params={{ storyId: String(story.id) }}
-      className="block rounded-xl overflow-hidden border transition-shadow hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-xl border transition-shadow hover:shadow-md"
       style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", boxShadow: "var(--shadow-card)" }}
     >
-      <div
-        className="aspect-[3/2] flex items-center justify-center overflow-hidden"
-        style={{ background: "var(--color-surface-2)" }}
-      >
-        {cover ? (
-          <img src={cover} alt="" className="w-full h-full object-cover" loading="lazy" />
-        ) : (
-          <BookOpen size={28} style={{ color: "var(--color-text-muted)" }} />
-        )}
-      </div>
-      <div className="p-4">
-        <div className="mb-1.5">
-          <CategoryChip name={story.category} color={story.category_color} icon={story.category_icon} />
+      {cover ? (
+        <img src={cover} alt={story.title} className="h-44 w-full object-cover" loading="lazy" />
+      ) : placeholder ? (
+        <div
+          className="flex h-44 w-full items-center justify-center text-4xl"
+          style={{ background: "linear-gradient(135deg, var(--color-surface-2), rgba(212,168,106,0.2))" }}
+        >
+          📝
         </div>
-        <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+      ) : null}
+      <div className="flex flex-1 flex-col p-5">
+        {story.category && (
+          <div className="mb-2">
+            <CategoryChip name={story.category} color={story.category_color} icon={story.category_icon} />
+          </div>
+        )}
+        <h3 className="font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
           {story.title}
         </h3>
         {story.excerpt && (
-          <p className="text-xs mt-1.5 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
+          <p className="mt-2 line-clamp-2 flex-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {story.excerpt}
           </p>
         )}
-        {date && (
-          <div className="text-xs mt-2" style={{ color: "var(--color-text-muted)" }}>
-            {date}
-          </div>
-        )}
-        {tags.length > 0 && (
-          <div className="mt-2">
+        {(date || tags.length > 0) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {date && (
+              <span className="text-xs font-medium" style={{ color: "var(--color-primary)" }}>
+                {date}
+              </span>
+            )}
             <TagList tags={tags} />
           </div>
         )}
