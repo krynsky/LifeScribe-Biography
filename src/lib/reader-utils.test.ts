@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBiographyEmpty, filterPublishedStories } from "./reader-utils";
+import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate } from "./reader-utils";
 import type { Story } from "./models";
 
 describe("isBiographyEmpty", () => {
@@ -51,5 +51,32 @@ describe("filterPublishedStories", () => {
 
   it("returns an empty array when nothing is published", () => {
     expect(filterPublishedStories([story({ status: "draft" })])).toEqual([]);
+  });
+});
+
+describe("firstImageFromContent", () => {
+  it("finds the first nested image src", () => {
+    const doc = JSON.stringify({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "hi" }] },
+        { type: "image", attrs: { src: "a.png" } },
+        { type: "image", attrs: { src: "b.png" } },
+      ],
+    });
+    expect(firstImageFromContent(doc)).toBe("a.png");
+  });
+  it("returns null for empty or malformed content", () => {
+    expect(firstImageFromContent(null)).toBeNull();
+    expect(firstImageFromContent("not json")).toBeNull();
+  });
+});
+
+describe("formatDisplayDate", () => {
+  it("formats by precision", () => {
+    expect(formatDisplayDate("2017-02-14", "year")).toBe("2017");
+    expect(formatDisplayDate("2017-02-14", "month")).toBe("February 2017");
+    expect(formatDisplayDate("2017-02-14", "day")).toBe("February 14, 2017");
+    expect(formatDisplayDate(null)).toBe("");
   });
 });

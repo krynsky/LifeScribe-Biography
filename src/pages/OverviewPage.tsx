@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Clock, Image, Users, Briefcase, MapPin, Download, Eye } from "lucide-react";
+import { BookOpen, Clock, Image, Users, Briefcase, MapPin, Eye } from "lucide-react";
 import { getBiographyStats } from "@/lib/actions/biography";
+import { useViewMode } from "@/lib/view-mode";
 
 interface Stats {
   storyCount: number;
@@ -23,6 +24,7 @@ interface StatCard {
 
 export default function OverviewPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const { setMode } = useViewMode();
 
   useEffect(() => {
     getBiographyStats().then(setStats).catch(console.error);
@@ -52,10 +54,11 @@ export default function OverviewPage() {
         </p>
       </div>
 
-      {/* Reader Mode entry point */}
-      <Link
-        to="/reader"
-        className="flex items-center gap-4 p-6 rounded-xl border mb-8 transition-shadow hover:shadow-md"
+      {/* Switches the app to Read mode */}
+      <button
+        type="button"
+        onClick={() => setMode("read")}
+        className="w-full text-left flex items-center gap-4 p-6 rounded-xl border mb-8 transition-shadow hover:shadow-md"
         style={{
           background: "var(--color-surface)",
           borderColor: "var(--color-primary)",
@@ -76,7 +79,7 @@ export default function OverviewPage() {
             See your life story the way a visitor would experience it
           </div>
         </div>
-      </Link>
+      </button>
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
@@ -113,57 +116,6 @@ export default function OverviewPage() {
             </Link>
           );
         })}
-      </div>
-
-      {/* Quick actions */}
-      <div
-        className="rounded-xl border p-6"
-        style={{
-          background: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-          boxShadow: "var(--shadow-card)",
-        }}
-      >
-        <h2
-          className="text-lg mb-4"
-          style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}
-        >
-          Get Started
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            to="/stories/new"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium"
-            style={{ background: "var(--color-primary)" }}
-          >
-            <BookOpen size={14} />
-            Write a Story
-          </Link>
-          <Link
-            to="/import/photos"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border"
-            style={{
-              color: "var(--color-text)",
-              borderColor: "var(--color-border)",
-              background: "var(--color-surface)",
-            }}
-          >
-            <Download size={14} />
-            Import Photos
-          </Link>
-          <Link
-            to="/import/archive"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border"
-            style={{
-              color: "var(--color-text)",
-              borderColor: "var(--color-border)",
-              background: "var(--color-surface)",
-            }}
-          >
-            <Download size={14} />
-            Import from Facebook / Instagram
-          </Link>
-        </div>
       </div>
     </div>
   );

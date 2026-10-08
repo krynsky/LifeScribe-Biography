@@ -9,13 +9,18 @@ import {
   Download,
   Settings,
   LayoutDashboard,
+  Eye,
+  Pencil,
 } from "lucide-react";
+import { useViewMode } from "@/lib/view-mode";
 
 interface NavItem {
   label: string;
   path: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
   matchPrefix?: boolean;
+  /** Draw a divider above this item. */
+  separator?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -26,13 +31,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Family Tree", path: "/family-tree", icon: Users },
   { label: "Career", path: "/career", icon: Briefcase },
   { label: "Maps & Places", path: "/maps", icon: MapPin },
-  { label: "Import", path: "/import", icon: Download, matchPrefix: true },
+  { label: "Import", path: "/import", icon: Download, matchPrefix: true, separator: true },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const { mode, setMode } = useViewMode();
 
   function isActive(item: NavItem): boolean {
     if (item.matchPrefix) {
@@ -70,6 +76,40 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Read / Edit toggle */}
+      <div className="px-3 pt-4">
+        <div
+          role="group"
+          aria-label="View mode"
+          className="flex p-0.5 rounded-lg"
+          style={{ background: "var(--color-sidebar-hover-bg)" }}
+        >
+          {([
+            { value: "read", label: "Read", icon: Eye },
+            { value: "edit", label: "Edit", icon: Pencil },
+          ] as const).map(({ value, label, icon: ModeIcon }) => {
+            const selected = mode === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setMode(value)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs transition-colors"
+                style={{
+                  background: selected ? "var(--color-sidebar-active-bg)" : "transparent",
+                  color: selected ? "var(--color-sidebar-text-active)" : "var(--color-sidebar-text)",
+                  fontWeight: selected ? 500 : 400,
+                }}
+              >
+                <ModeIcon size={12} strokeWidth={1.75} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
@@ -77,8 +117,15 @@ export default function Sidebar() {
           const Icon = item.icon;
 
           return (
+            <div key={item.path}>
+              {item.separator && (
+                <div
+                  role="separator"
+                  className="my-3 mx-3 border-t"
+                  style={{ borderColor: "rgba(255,255,255,0.08)" }}
+                />
+              )}
             <Link
-              key={item.path}
               to={item.path}
               className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors"
               style={{
@@ -105,6 +152,7 @@ export default function Sidebar() {
               <Icon size={16} strokeWidth={1.75} />
               <span>{item.label}</span>
             </Link>
+            </div>
           );
         })}
       </nav>

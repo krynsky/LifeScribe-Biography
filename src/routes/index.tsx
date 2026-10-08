@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/react-router";
 import AppShell from "@/components/layout/AppShell";
 
 // Pages
@@ -18,29 +18,21 @@ import ArchiveImportPage from "@/pages/import/ArchiveImportPage";
 import ReviewPage from "@/pages/import/ReviewPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
 
-// Reader pages
-import ReaderShell from "@/pages/reader/ReaderShell";
-import ReaderCoverPage from "@/pages/reader/ReaderCoverPage";
-import ReaderStoriesPage from "@/pages/reader/ReaderStoriesPage";
-import ReaderStoryPage from "@/pages/reader/ReaderStoryPage";
-import ReaderTimelinePage from "@/pages/reader/ReaderTimelinePage";
-import ReaderGalleryPage from "@/pages/reader/ReaderGalleryPage";
-import ReaderAlbumPage from "@/pages/reader/ReaderAlbumPage";
-import ReaderFamilyTreePage from "@/pages/reader/ReaderFamilyTreePage";
-import ReaderCareerPage from "@/pages/reader/ReaderCareerPage";
-import ReaderMapsPage from "@/pages/reader/ReaderMapsPage";
+// Read-mode views (web-style presentation, shown when the sidebar toggle is on "Read")
+import HomeView from "@/views/HomeView";
+import StoriesView from "@/views/StoriesView";
+import StoryView from "@/views/StoryView";
+import TimelineView from "@/views/TimelineView";
+import GalleryView from "@/views/GalleryView";
+import AlbumView from "@/views/AlbumView";
+import FamilyTreeView from "@/views/FamilyTreeView";
+import CareerView from "@/views/CareerView";
+import MapsView from "@/views/MapsView";
+import { byMode } from "@/lib/view-mode";
 
-// Root route — wraps editor routes in AppShell; Reader Mode routes render
-// full-screen with their own chrome (ReaderShell), so the root component
-// switches based on the current path.
+// Root route — every page lives inside AppShell; each section's page switches
+// between its editor and its read-only view via the sidebar Read/Edit toggle.
 function RootComponent() {
-  const routerState = useRouterState();
-  const isReader = routerState.location.pathname.startsWith("/reader");
-
-  if (isReader) {
-    return <Outlet />;
-  }
-
   return (
     <AppShell>
       <Outlet />
@@ -55,14 +47,14 @@ const rootRoute = createRootRoute({
 const overviewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: OverviewPage,
+  component: byMode(OverviewPage, HomeView),
 });
 
 // Stories
 const storiesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/stories",
-  component: StoryListPage,
+  component: byMode(StoryListPage, StoriesView),
 });
 const newStoryRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -72,47 +64,47 @@ const newStoryRoute = createRoute({
 const storyEditorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/stories/$storyId",
-  component: StoryEditorPage,
+  component: byMode(StoryEditorPage, StoryView),
 });
 
 // Timeline
 const timelineRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/timeline",
-  component: TimelinePage,
+  component: byMode(TimelinePage, TimelineView),
 });
 
 // Gallery
 const galleryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/gallery",
-  component: GalleryPage,
+  component: byMode(GalleryPage, GalleryView),
 });
 const albumRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/gallery/albums/$albumId",
-  component: AlbumPage,
+  component: byMode(AlbumPage, AlbumView),
 });
 
 // Family Tree
 const familyTreeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/family-tree",
-  component: FamilyTreePage,
+  component: byMode(FamilyTreePage, FamilyTreeView),
 });
 
 // Career
 const careerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/career",
-  component: CareerPage,
+  component: byMode(CareerPage, CareerView),
 });
 
 // Maps
 const mapsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/maps",
-  component: MapsPage,
+  component: byMode(MapsPage, MapsView),
 });
 
 // Import
@@ -144,72 +136,6 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
-// Reader Mode — full-screen read-only presentation. readerRoute owns the
-// persistent sidebar (via ReaderShell); every section below is a child so
-// they share it through a single <Outlet/>.
-const readerRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/reader",
-  component: ReaderShell,
-});
-const readerCoverRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/",
-  component: ReaderCoverPage,
-});
-const readerStoriesRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/stories",
-  component: ReaderStoriesPage,
-});
-const readerStoryRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/stories/$storyId",
-  component: ReaderStoryPage,
-});
-const readerTimelineRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/timeline",
-  component: ReaderTimelinePage,
-});
-const readerGalleryRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/gallery",
-  component: ReaderGalleryPage,
-});
-const readerAlbumRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/gallery/albums/$albumId",
-  component: ReaderAlbumPage,
-});
-const readerFamilyTreeRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/family-tree",
-  component: ReaderFamilyTreePage,
-});
-const readerCareerRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/career",
-  component: ReaderCareerPage,
-});
-const readerMapsRoute = createRoute({
-  getParentRoute: () => readerRoute,
-  path: "/maps",
-  component: ReaderMapsPage,
-});
-
-const readerRouteWithChildren = readerRoute.addChildren([
-  readerCoverRoute,
-  readerStoriesRoute,
-  readerStoryRoute,
-  readerTimelineRoute,
-  readerGalleryRoute,
-  readerAlbumRoute,
-  readerFamilyTreeRoute,
-  readerCareerRoute,
-  readerMapsRoute,
-]);
-
 const routeTree = rootRoute.addChildren([
   overviewRoute,
   storiesRoute,
@@ -226,7 +152,6 @@ const routeTree = rootRoute.addChildren([
   archiveImportRoute,
   reviewRoute,
   settingsRoute,
-  readerRouteWithChildren,
 ]);
 
 export const router = createRouter({ routeTree });
