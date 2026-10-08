@@ -1,9 +1,9 @@
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
-import { mkdir, writeFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch } from "@tauri-apps/plugin-http";
-import { ENTITIES, entityDef, type EntityType } from "./registry";
+import { ENTITIES, entityDef, writableColumns, type EntityType } from "./registry";
 import { getSyncToken, getSyncUrl } from "./config";
-import type { RemoteRecord, WebAdapter } from "./types";
+import type { RemoteRecord, RemoteRelationship, WebAdapter } from "./types";
 
 interface ApiResponse<T> {
   data: T;
@@ -31,10 +31,29 @@ async function api<T>(method: string, path: string, body?: unknown, _retries = 1
   return json.data;
 }
 
+/** Arrays (e.g. tag names) are stored as JSON text in a single column. */
+function normalizeExtra(v: unknown): unknown {
+  return Array.isArray(v) ? JSON.stringify(v) : (v ?? null);
+}
+
+/** Stable short hash used to name downloaded image files after their source URL. */
+function hashUrl(url: string): string {
+  let h = 5381;
+  for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<string, unknown>>): RemoteRecord[] {
   return rows.map((r) => {
     const fields: Record<string, unknown> = {};
     for (const c of def.columns) fields[c] = r[c] ?? null;
+    // Web-owned extras: copy only what the API actually sent so older servers don't blank local data.
+    for (const c of writableColumns(def)) {
+      if (!def.columns.includes(c) && c in r) fields[c] = normalizeExtra(r[c]);
+    }
+    for (const img of def.images ?? []) {
+      if (img.remoteField in r) fields[img.remoteField] = r[img.remoteField] ?? null;
+    }
     if (def.binary) {
       // Media needs its download URL plus the web-side names the desktop must
       // resolve (album CUID → local album id, size_bytes → file_size).
@@ -53,10 +72,17 @@ function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<s
 }
 
 export class RestWebAdapter implements WebAdapter {
+  private relationships: RemoteRelationship[] = [];
+
+  getFamilyRelationships(): RemoteRelationship[] {
+    return this.relationships;
+  }
+
   async pullAll(): Promise<Record<EntityType, RemoteRecord[]>> {
     // limit=500 is the server's max; without it the route defaults to 50,
     // truncating large media sets. (Pagination is a future need beyond 500.)
     const data = await api<Record<string, Array<Record<string, unknown>>>>("GET", "/sync/pull?limit=500");
+    this.relationships = ((data as unknown as { family_relationships?: RemoteRelationship[] }).family_relationships) ?? [];
     const out = {} as Record<EntityType, RemoteRecord[]>;
     for (const def of ENTITIES) {
       const raw = data[def.remoteKey];
@@ -142,6 +168,19 @@ export class RestWebAdapter implements WebAdapter {
     if (!resp.ok) throw new Error(`media download ${resp.status}: ${fetchUrl}`);
     const bytes = new Uint8Array(await resp.arrayBuffer());
     await writeFile(localPath, bytes);
+    return localPath;
+  }
+
+  async downloadImage(url: string): Promise<string> {
+    const dataDir = await appLocalDataDir();
+    const mediaDir = await join(dataDir, "media");
+    await mkdir(mediaDir, { recursive: true });
+    const ext = (new URL(url).pathname.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const localPath = await join(mediaDir, `img-${hashUrl(url)}.${ext}`);
+    if (await exists(localPath)) return localPath;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`image download ${resp.status}: ${url}`);
+    await writeFile(localPath, new Uint8Array(await resp.arrayBuffer()));
     return localPath;
   }
 }

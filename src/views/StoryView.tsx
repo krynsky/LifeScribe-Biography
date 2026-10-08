@@ -5,7 +5,8 @@ import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import { getStory } from "@/lib/actions/stories";
 import { getBiography } from "@/lib/actions/biography";
 import { imageSrc } from "@/lib/image-src";
-import { formatDisplayDate } from "@/lib/reader-utils";
+import { formatDisplayDate, parseTags } from "@/lib/reader-utils";
+import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import type { Story } from "@/lib/models";
 
 export default function StoryView() {
@@ -35,6 +36,7 @@ export default function StoryView() {
   }
 
   const hero = imageSrc(story.featured_image_path);
+  const tags = parseTags(story.tags);
   const date = formatDisplayDate(story.event_date, story.event_date_precision);
 
   return (
@@ -45,7 +47,10 @@ export default function StoryView() {
       {hero && (
         <img src={hero} alt="" className="w-full rounded-xl mt-4 mb-6 object-cover" style={{ maxHeight: 420 }} />
       )}
-      <h1 className="text-3xl mt-4 mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
+      <div className="mt-4">
+        <CategoryChip name={story.category} color={story.category_color} icon={story.category_icon} />
+      </div>
+      <h1 className="text-3xl mt-2 mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
         {story.title}
       </h1>
       {(author || date) && (
@@ -59,6 +64,11 @@ export default function StoryView() {
         </p>
       )}
       <StoryEditor content={story.content} onChange={() => {}} readOnly />
+      {tags.length > 0 && (
+        <div className="mt-8 pt-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+          <TagList tags={tags} />
+        </div>
+      )}
     </ReadPage>
   );
 }

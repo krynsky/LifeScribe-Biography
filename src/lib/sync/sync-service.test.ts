@@ -7,6 +7,7 @@ class FakeStore implements DataStore {
   local: Record<string, LocalRecord[]> = {};
   state: Record<string, SyncState[]> = {};
   nextId = 100;
+  replaceFamilyRelationships?: DataStore["replaceFamilyRelationships"];
   async listLocal(t: EntityType) { return this.local[t] ?? []; }
   async getLocal(t: EntityType, id: number) { return (this.local[t] ?? []).find((r) => r.local_id === id) ?? null; }
   async upsertLocal(t: EntityType, fields: Record<string, unknown>) {
@@ -41,6 +42,8 @@ class FakeStore implements DataStore {
 
 class FakeAdapter implements WebAdapter {
   writeCalls = 0;
+  getFamilyRelationships?: WebAdapter["getFamilyRelationships"];
+  downloadImage?: WebAdapter["downloadImage"];
   constructor(public remote: Partial<Record<EntityType, RemoteRecord[]>> = {}) {}
   async pullAll() {
     const out: Record<EntityType, RemoteRecord[]> = {
@@ -209,5 +212,64 @@ describe("SyncService.refresh — media album linkage", () => {
     expect(store.local.media!.length).toBe(1);
     expect(store.local.media![0].fields.source_url).toBe("https://www.youtube.com/embed/abc");
     expect(store.local.media![0].fields.album_id).toBe(7);
+  });
+});
+
+describe("SyncService.refresh — web parity fields", () => {
+  class ImageAdapter extends FakeAdapter {
+    downloaded: string[] = [];
+    constructor(remote: ConstructorParameters<typeof FakeAdapter>[0]) {
+      super(remote);
+      this.downloadImage = async (url: string) => { this.downloaded.push(url); return `/local/${url.split("/").pop()}`; };
+    }
+  }
+
+  it("downloads a story's cover image and stores the local path", async () => {
+    const store = new FakeStore();
+    const adapter = new ImageAdapter({
+      story: [{ remote_id: "r1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "T", featured_image_url: "https://files.x/cover.jpg" } }],
+    });
+    await new SyncService(store, adapter, "web-master").refresh();
+    expect(adapter.downloaded).toEqual(["https://files.x/cover.jpg"]);
+    expect(store.local.story[0].fields.featured_image_path).toBe("/local/cover.jpg");
+  });
+
+  it("leaves local images alone when the web API sends no image field", async () => {
+    const store = new FakeStore();
+    const adapter = new ImageAdapter({
+      story: [{ remote_id: "r1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "T" } }],
+    });
+    await new SyncService(store, adapter, "web-master").refresh();
+    expect(adapter.downloaded).toEqual([]);
+    expect("featured_image_path" in store.local.story[0].fields).toBe(false);
+  });
+
+  it("a failed image download is reported but still creates the record", async () => {
+    const store = new FakeStore();
+    const adapter = new ImageAdapter({
+      story: [{ remote_id: "r1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "T", featured_image_url: "https://files.x/c.jpg" } }],
+    });
+    adapter.downloadImage = async () => { throw new Error("404"); };
+    const summary = await new SyncService(store, adapter, "web-master").refresh();
+    expect(summary.created).toBe(1);
+    expect(summary.errors.length).toBe(1);
+  });
+
+  it("rebuilds family relationships onto local member ids", async () => {
+    const store = new FakeStore();
+    let saved: unknown[] = [];
+    store.replaceFamilyRelationships = async (rels) => { saved = rels; };
+    const adapter = new ImageAdapter({
+      family_member: [
+        { remote_id: "a", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { given_name: "A" } },
+        { remote_id: "b", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { given_name: "B" } },
+      ],
+    });
+    adapter.getFamilyRelationships = () => [
+      { from_remote_id: "a", to_remote_id: "b", type: "parent" },
+      { from_remote_id: "a", to_remote_id: "missing", type: "spouse" },
+    ];
+    await new SyncService(store, adapter, "web-master").refresh();
+    expect(saved).toEqual([{ from_member_id: 100, to_member_id: 101, relationship_type: "parent" }]);
   });
 });

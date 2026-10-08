@@ -5,6 +5,7 @@ import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import { listMilestones } from "@/lib/actions/milestones";
 import { imageSrc } from "@/lib/image-src";
 import { formatDisplayDate } from "@/lib/reader-utils";
+import CategoryChip from "@/components/reader/CategoryChip";
 import type { Milestone } from "@/lib/models";
 
 export default function TimelineView() {
@@ -62,14 +63,7 @@ export default function TimelineView() {
                       {img && <img src={img} alt="" className="w-full object-cover" style={{ maxHeight: 240 }} loading="lazy" />}
                       <div className="p-4">
                         <div className="flex items-center gap-2 text-xs mb-1" style={{ color: "var(--color-text-muted)" }}>
-                          {m.category && (
-                            <span
-                              className="px-2 py-0.5 rounded-full"
-                              style={{ background: `${m.color || "var(--color-primary)"}22`, color: "var(--color-text-secondary)" }}
-                            >
-                              {m.category}
-                            </span>
-                          )}
+                          <CategoryChip name={m.category} color={m.category_color ?? m.color} icon={m.category_icon} />
                           <span>{formatDisplayDate(m.date, m.date_precision)}</span>
                         </div>
                         <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>

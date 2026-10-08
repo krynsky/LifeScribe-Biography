@@ -344,6 +344,60 @@ ALTER TABLE albums ADD COLUMN cover_image TEXT;
 ALTER TABLE media ADD COLUMN remote_url TEXT;
 `,
   ],
+  // Existing web-linked rows predate these fields, so the trailing UPDATEs force a
+  // re-pull of every row with no unpublished local edits on the next Refresh.
+  // (No SQL comments inside: the runner drops any statement chunk starting with "--".)
+  [
+    "0005_web_parity_fields",
+    `
+ALTER TABLE stories ADD COLUMN category TEXT;
+ALTER TABLE stories ADD COLUMN category_color TEXT;
+ALTER TABLE stories ADD COLUMN category_icon TEXT;
+ALTER TABLE stories ADD COLUMN tags TEXT;
+
+ALTER TABLE milestones ADD COLUMN category_color TEXT;
+ALTER TABLE milestones ADD COLUMN category_icon TEXT;
+
+ALTER TABLE career_entries ADD COLUMN employment_type TEXT;
+ALTER TABLE career_entries ADD COLUMN category TEXT;
+ALTER TABLE career_entries ADD COLUMN category_color TEXT;
+ALTER TABLE career_entries ADD COLUMN category_icon TEXT;
+
+ALTER TABLE map_pins ADD COLUMN image_path TEXT;
+ALTER TABLE map_pins ADD COLUMN category TEXT;
+ALTER TABLE map_pins ADD COLUMN category_color TEXT;
+ALTER TABLE map_pins ADD COLUMN category_icon TEXT;
+
+ALTER TABLE family_members ADD COLUMN gender TEXT;
+ALTER TABLE family_members ADD COLUMN birth_surname TEXT;
+ALTER TABLE family_members ADD COLUMN nickname TEXT;
+ALTER TABLE family_members ADD COLUMN suffix TEXT;
+
+ALTER TABLE albums ADD COLUMN category TEXT;
+ALTER TABLE albums ADD COLUMN category_color TEXT;
+ALTER TABLE albums ADD COLUMN category_icon TEXT;
+ALTER TABLE albums ADD COLUMN tags TEXT;
+
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'story' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM stories t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'milestone' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM milestones t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'career' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM career_entries t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'map_pin' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM map_pins t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'family_member' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM family_members t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+UPDATE sync_state SET last_synced_remote_at = NULL
+  WHERE entity_type = 'album' AND last_synced_at IS NOT NULL
+    AND EXISTS (SELECT 1 FROM albums t WHERE t.id = sync_state.local_id AND t.updated_at <= sync_state.last_synced_at);
+`,
+  ],
 ];
 
 // Helper to convert a local file path to a Tauri asset URL for display

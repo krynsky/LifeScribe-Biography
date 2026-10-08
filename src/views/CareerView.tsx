@@ -4,6 +4,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import { listCareerEntries } from "@/lib/actions/career";
 import { imageSrc } from "@/lib/image-src";
+import CategoryChip from "@/components/reader/CategoryChip";
 import type { CareerEntry } from "@/lib/models";
 
 function formatMonth(date: string | null): string {
@@ -73,8 +74,18 @@ export default function CareerView() {
                         </span>
                       )}
                     </div>
-                    <div className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>{entry.organization}</div>
+                    <div className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>
+                      {entry.organization}
+                      {entry.employment_type && (
+                        <span style={{ color: "var(--color-text-muted)" }}> · {entry.employment_type}</span>
+                      )}
+                    </div>
                     <div className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>{dateRange(entry)}</div>
+                    {entry.category && (
+                      <div className="mt-2">
+                        <CategoryChip name={entry.category} color={entry.category_color} icon={entry.category_icon} />
+                      </div>
+                    )}
                     {entry.location && (
                       <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
                         <MapPin size={11} />

@@ -55,3 +55,27 @@ export function formatDisplayDate(date: string | null, precision: "year" | "mont
   const day = Number(date.substring(8, 10));
   return day ? `${names[month - 1]} ${day}, ${year}` : `${names[month - 1]} ${year}`;
 }
+
+/** Parse the JSON-array tag column synced from the web into a clean list of names. */
+export function parseTags(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((t): t is string => typeof t === "string" && t.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Web-style display name, e.g. "Maria Gonzalez (née Lopez), Jr." */
+export function formatFamilyName(m: {
+  given_name: string;
+  surname?: string | null;
+  birth_surname?: string | null;
+  suffix?: string | null;
+}): string {
+  let name = `${m.given_name} ${m.surname ?? ""}`.trim();
+  if (m.birth_surname && m.birth_surname !== m.surname) name += ` (née ${m.birth_surname})`;
+  if (m.suffix) name += `, ${m.suffix}`;
+  return name || "Unnamed";
+}

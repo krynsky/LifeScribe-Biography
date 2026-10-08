@@ -1,12 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { BookOpen } from "lucide-react";
 import { imageSrc } from "@/lib/image-src";
-import { firstImageFromContent, formatDisplayDate } from "@/lib/reader-utils";
+import { firstImageFromContent, formatDisplayDate, parseTags } from "@/lib/reader-utils";
+import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import type { Story } from "@/lib/models";
 
 export default function StoryCard({ story }: { story: Story }) {
   const cover = imageSrc(story.featured_image_path) ?? imageSrc(firstImageFromContent(story.content));
   const date = formatDisplayDate(story.event_date, story.event_date_precision);
+  const tags = parseTags(story.tags);
 
   return (
     <Link
@@ -26,6 +28,9 @@ export default function StoryCard({ story }: { story: Story }) {
         )}
       </div>
       <div className="p-4">
+        <div className="mb-1.5">
+          <CategoryChip name={story.category} color={story.category_color} icon={story.category_icon} />
+        </div>
         <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
           {story.title}
         </h3>
@@ -37,6 +42,11 @@ export default function StoryCard({ story }: { story: Story }) {
         {date && (
           <div className="text-xs mt-2" style={{ color: "var(--color-text-muted)" }}>
             {date}
+          </div>
+        )}
+        {tags.length > 0 && (
+          <div className="mt-2">
+            <TagList tags={tags} />
           </div>
         )}
       </div>

@@ -3,6 +3,8 @@ import MapView from "@/components/maps/MapView";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import { listMapPins } from "@/lib/actions/map-pins";
 import { formatDisplayDate } from "@/lib/reader-utils";
+import { imageSrc } from "@/lib/image-src";
+import CategoryChip from "@/components/reader/CategoryChip";
 import type { MapPin } from "@/lib/models";
 
 export default function MapsView() {
@@ -28,18 +30,25 @@ export default function MapsView() {
             All Locations
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pins.map((pin) => (
+            {pins.map((pin) => {
+              const img = imageSrc(pin.image_path);
+              return (
               <button
                 key={pin.id}
                 type="button"
                 onClick={() => setSelectedPin(pin)}
-                className="text-left p-4 rounded-xl border transition-shadow hover:shadow-md"
+                className="text-left rounded-xl border overflow-hidden transition-shadow hover:shadow-md"
                 style={{
                   background: "var(--color-surface)",
                   borderColor: selectedPin?.id === pin.id ? "var(--color-primary)" : "var(--color-border)",
                   boxShadow: "var(--shadow-card)",
                 }}
               >
+                {img && <img src={img} alt="" className="w-full h-36 object-cover" loading="lazy" />}
+                <div className="p-4">
+                <div className="mb-1.5">
+                  <CategoryChip name={pin.category} color={pin.category_color} icon={pin.category_icon} />
+                </div>
                 <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
                   {pin.name}
                 </div>
@@ -56,8 +65,10 @@ export default function MapsView() {
                     {pin.description}
                   </p>
                 )}
+                </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

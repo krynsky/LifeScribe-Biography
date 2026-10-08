@@ -5,6 +5,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import { listAlbums } from "@/lib/actions/gallery";
 import { imageSrc } from "@/lib/image-src";
+import { parseTags } from "@/lib/reader-utils";
+import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import type { Album } from "@/lib/models";
 
 type AlbumRow = Album & { media_count: number; cover_path: string | null };
@@ -62,6 +64,9 @@ export default function GalleryView() {
                     </span>
                   </div>
                   <div className="p-3">
+                    <div className="mb-1.5">
+                      <CategoryChip name={album.category} color={album.category_color} icon={album.category_icon} />
+                    </div>
                     <div className="font-semibold text-sm" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
                       {album.name}
                     </div>
@@ -69,6 +74,11 @@ export default function GalleryView() {
                       <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
                         {album.description}
                       </p>
+                    )}
+                    {parseTags(album.tags).length > 0 && (
+                      <div className="mt-2">
+                        <TagList tags={parseTags(album.tags)} />
+                      </div>
                     )}
                   </div>
                 </Link>

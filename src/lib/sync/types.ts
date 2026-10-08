@@ -35,6 +35,13 @@ export type Decision =
   | { action: "delete_local" } // present locally, deleted on master
   | { action: "noop" };
 
+/** A family relationship as pulled from the web, addressed by web member ids. */
+export interface RemoteRelationship {
+  from_remote_id: string;
+  to_remote_id: string;
+  type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
+}
+
 export interface DataStore {
   listLocal(type: EntityType): Promise<LocalRecord[]>;
   getLocal(type: EntityType, localId: number): Promise<LocalRecord | null>;
@@ -63,6 +70,11 @@ export interface DataStore {
     remote_url: string | null
   ): Promise<void>;
 
+  /** Replace all family relationships with the given local-id pairs (web is the source of truth). */
+  replaceFamilyRelationships?(
+    rels: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>
+  ): Promise<void>;
+
   listSyncState(type: EntityType): Promise<SyncState[]>;
   getSyncState(type: EntityType, localId: number): Promise<SyncState | null>;
   getSyncStateByRemote(type: EntityType, remoteId: string): Promise<SyncState | null>;
@@ -82,4 +94,8 @@ export interface WebAdapter {
   deleteRemote(type: EntityType, remoteId: string): Promise<void>;
   /** Download one media file to local storage; returns the local file path. */
   downloadMedia(remote: RemoteRecord): Promise<string>;
+  /** Download a web image (story cover, photo, logo…) to local storage; returns the local file path. */
+  downloadImage?(url: string): Promise<string>;
+  /** Family relationships from the most recent pullAll, if the web supplied any. */
+  getFamilyRelationships?(): RemoteRelationship[];
 }

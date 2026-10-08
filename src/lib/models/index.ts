@@ -23,6 +23,11 @@ export interface Story {
   event_date: string | null;
   event_date_precision: "year" | "month" | "day";
   featured_image_path: string | null;
+  // Web-owned display fields mirrored by sync
+  category?: string | null;
+  category_color?: string | null;
+  category_icon?: string | null;
+  tags?: string | null; // JSON array of tag names
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -37,6 +42,9 @@ export interface Milestone {
   category: string | null;
   color: string;
   image_path: string | null;
+  // Web-owned display fields mirrored by sync (category is the column above)
+  category_color?: string | null;
+  category_icon?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +57,11 @@ export interface Album {
   cover_image: string | null; // explicit cover URL synced from the web (matches a media remote_url)
   date_from: string | null;
   date_to: string | null;
+  // Web-owned display fields mirrored by sync
+  category?: string | null;
+  category_color?: string | null;
+  category_icon?: string | null;
+  tags?: string | null; // JSON array of tag names
   created_at: string;
   updated_at: string;
   // Joined count
@@ -91,6 +104,10 @@ export interface FamilyMember {
   birth_place: string | null;
   bio: string | null;
   photo_path: string | null;
+  gender?: string | null; // "male" | "female" | "other"
+  birth_surname?: string | null;
+  nickname?: string | null;
+  suffix?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -113,6 +130,11 @@ export interface CareerEntry {
   is_current: boolean;
   location: string | null;
   logo_path: string | null;
+  employment_type?: string | null;
+  // Web-owned display fields mirrored by sync
+  category?: string | null;
+  category_color?: string | null;
+  category_icon?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,6 +149,11 @@ export interface MapPin {
   visit_date: string | null;
   pin_type: "place" | "home" | "work" | "travel" | "memory";
   color: string;
+  image_path?: string | null;
+  // Web-owned display fields mirrored by sync
+  category?: string | null;
+  category_color?: string | null;
+  category_icon?: string | null;
   created_at: string;
   updated_at: string;
 }

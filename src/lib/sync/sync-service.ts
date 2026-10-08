@@ -81,7 +81,62 @@ export class SyncService {
         }
       }
     }
+
+    if (this.mode === "web-master") {
+      try {
+        await this.syncFamilyRelationships();
+      } catch (e) {
+        summary.errors.push(`family_relationships: ${(e as Error).message}`);
+      }
+    }
     return summary;
+  }
+
+  /** Rebuild local family relationships from the web's, mapped onto local member ids. */
+  private async syncFamilyRelationships(): Promise<void> {
+    const remote = this.adapter.getFamilyRelationships?.();
+    if (!remote || !this.store.replaceFamilyRelationships) return;
+    const idByRemote = new Map<string, number>();
+    for (const st of await this.store.listSyncState("family_member")) {
+      if (st.remote_id) idByRemote.set(st.remote_id, st.local_id);
+    }
+    const rows = [];
+    for (const r of remote) {
+      const from = idByRemote.get(r.from_remote_id);
+      const to = idByRemote.get(r.to_remote_id);
+      if (from != null && to != null) {
+        rows.push({ from_member_id: from, to_member_id: to, relationship_type: r.type });
+      }
+    }
+    await this.store.replaceFamilyRelationships(rows);
+  }
+
+  /**
+   * Download any web images referenced by this record and return fields with the
+   * local file path columns filled in. A failed download never fails the record.
+   */
+  private async withDownloadedImages(
+    def: ReturnType<typeof entityDef>,
+    remote: RemoteRecord,
+    summary: RefreshSummary,
+    onProgress?: (msg: string) => void
+  ): Promise<Record<string, unknown>> {
+    const fields = { ...remote.fields };
+    for (const img of def.images ?? []) {
+      if (!(img.remoteField in remote.fields)) continue; // older web API: leave local image alone
+      const url = remote.fields[img.remoteField] as string | null;
+      if (!url) {
+        fields[img.pathColumn] = null;
+      } else if (this.adapter.downloadImage) {
+        try {
+          onProgress?.(`Downloading image for ${def.type}…`);
+          fields[img.pathColumn] = await this.adapter.downloadImage(url);
+        } catch (e) {
+          summary.errors.push(`${def.type}:${remote.remote_id} image: ${(e as Error).message}`);
+        }
+      }
+    }
+    return fields;
   }
 
   async publish(
@@ -174,7 +229,8 @@ export class SyncService {
           });
           await this.link(type, localId, remote);
         } else {
-          const localId = await this.store.upsertLocal(type, remote.fields);
+          const fields = await this.withDownloadedImages(def, remote, summary, onProgress);
+          const localId = await this.store.upsertLocal(type, fields);
           await this.link(type, localId, remote);
         }
         summary.created++;
@@ -195,7 +251,8 @@ export class SyncService {
             summary.updated++;
           }
         } else if (existing) {
-          await this.store.updateLocalById(type, existing.local_id, remote.fields);
+          const fields = await this.withDownloadedImages(def, remote, summary, onProgress);
+          await this.store.updateLocalById(type, existing.local_id, fields);
           await this.link(type, existing.local_id, remote);
           summary.updated++;
         }

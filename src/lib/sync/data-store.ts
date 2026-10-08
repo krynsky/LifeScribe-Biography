@@ -1,5 +1,5 @@
 import { query, execute } from "../db";
-import { entityDef, type EntityType } from "./registry";
+import { entityDef, writableColumns, type EntityType } from "./registry";
 import type { DataStore, LocalRecord, SyncState } from "./types";
 
 function toLocalRecord(def: ReturnType<typeof entityDef>, row: Record<string, unknown>): LocalRecord {
@@ -27,7 +27,7 @@ export class SqlDataStore implements DataStore {
 
   async upsertLocal(type: EntityType, fields: Record<string, unknown>): Promise<number> {
     const def = entityDef(type);
-    const cols = def.columns;
+    const cols = writableColumns(def);
     const values = cols.map((c) => fields[c] ?? null);
 
     if (def.singleton) {
@@ -50,8 +50,11 @@ export class SqlDataStore implements DataStore {
 
   async updateLocalById(type: EntityType, localId: number, fields: Record<string, unknown>): Promise<void> {
     const def = entityDef(type);
-    const set = def.columns.map((c) => `${c} = ?`).join(", ");
-    const values = def.columns.map((c) => fields[c] ?? null);
+    // Core columns always overwrite; web-owned extras only when the web supplied them,
+    // so an older web API (without the new fields) never blanks local data.
+    const cols = writableColumns(def).filter((c) => def.columns.includes(c) || c in fields);
+    const set = cols.map((c) => `${c} = ?`).join(", ");
+    const values = cols.map((c) => fields[c] ?? null);
     await execute(
       `UPDATE ${def.table} SET ${set}, updated_at = datetime('now') WHERE id = ?`,
       [...values, localId]
@@ -94,6 +97,18 @@ export class SqlDataStore implements DataStore {
       `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
       [album_id, file_size, remote_url, localId]
     );
+  }
+
+  async replaceFamilyRelationships(
+    rels: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>
+  ): Promise<void> {
+    await execute(`DELETE FROM family_relationships`);
+    for (const r of rels) {
+      await execute(
+        `INSERT OR IGNORE INTO family_relationships (from_member_id, to_member_id, relationship_type) VALUES (?,?,?)`,
+        [r.from_member_id, r.to_member_id, r.relationship_type]
+      );
+    }
   }
 
   async listSyncState(type: EntityType): Promise<SyncState[]> {

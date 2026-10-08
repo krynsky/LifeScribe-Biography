@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate } from "./reader-utils";
+import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate, parseTags, formatFamilyName } from "./reader-utils";
 import type { Story } from "./models";
 
 describe("isBiographyEmpty", () => {
@@ -78,5 +78,22 @@ describe("formatDisplayDate", () => {
     expect(formatDisplayDate("2017-02-14", "month")).toBe("February 2017");
     expect(formatDisplayDate("2017-02-14", "day")).toBe("February 14, 2017");
     expect(formatDisplayDate(null)).toBe("");
+  });
+});
+
+describe("parseTags", () => {
+  it("parses a JSON array and tolerates junk", () => {
+    expect(parseTags('["Chicago","Family"]')).toEqual(["Chicago", "Family"]);
+    expect(parseTags(null)).toEqual([]);
+    expect(parseTags("nope")).toEqual([]);
+    expect(parseTags('{"a":1}')).toEqual([]);
+  });
+});
+
+describe("formatFamilyName", () => {
+  it("adds née and suffix like the web", () => {
+    expect(formatFamilyName({ given_name: "Alicia", surname: "Krynsky", birth_surname: "Spika" })).toBe("Alicia Krynsky (née Spika)");
+    expect(formatFamilyName({ given_name: "John", surname: "Doe", suffix: "Jr." })).toBe("John Doe, Jr.");
+    expect(formatFamilyName({ given_name: "Mark", surname: null })).toBe("Mark");
   });
 });
