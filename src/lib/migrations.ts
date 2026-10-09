@@ -18,12 +18,32 @@ export function isBenignMigrationError(stmt: string, err: unknown): boolean {
   return false;
 }
 
-/** Split a migration into individual statements, like the app's runner does. */
+/**
+ * Split a migration into individual statements, like the app's runner does: on ";" except inside
+ * a CREATE TRIGGER ... BEGIN ... END block, whose body contains its own semicolons.
+ */
 export function splitStatements(sql: string): string[] {
-  return sql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+  const out: string[] = [];
+  let trigger: string[] | null = null;
+  for (const piece of sql.split(";")) {
+    const text = piece.trim();
+    if (trigger) {
+      trigger.push(piece);
+      if (/\bEND$/i.test(text)) {
+        out.push(trigger.join(";").trim());
+        trigger = null;
+      }
+      continue;
+    }
+    if (text.length === 0 || text.startsWith("--")) continue;
+    if (/^CREATE\s+TRIGGER\b/i.test(text) && !/\bEND$/i.test(text)) {
+      trigger = [piece];
+      continue;
+    }
+    out.push(text);
+  }
+  if (trigger) out.push(trigger.join(";").trim()); // unterminated trigger: let SQLite report it
+  return out;
 }
 
 // Ordered list of migration name → SQL content
@@ -540,6 +560,70 @@ CREATE TABLE IF NOT EXISTS uploaded_images (
   url TEXT NOT NULL,
   uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
 )
+`,
+  ],
+  // Records deleted in the app that already exist on the website. Triggers write them here (and clear the
+  // record's sync bookkeeping) so deleting is remembered no matter which screen did it. Publishing then
+  // asks whether to remove them from the website; Refresh never brings them back meanwhile.
+  [
+    "0010_sync_deletions",
+    `
+CREATE TABLE IF NOT EXISTS sync_deletions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_type TEXT NOT NULL,
+  remote_id TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL DEFAULT '',
+  deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_story AFTER DELETE ON stories
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'story', remote_id, OLD.title FROM sync_state
+     WHERE entity_type = 'story' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'story' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_milestone AFTER DELETE ON milestones
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'milestone', remote_id, OLD.title FROM sync_state
+     WHERE entity_type = 'milestone' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'milestone' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_career AFTER DELETE ON career_entries
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'career', remote_id, COALESCE(OLD.title || ' @ ', '') || OLD.organization FROM sync_state
+     WHERE entity_type = 'career' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'career' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_map_pin AFTER DELETE ON map_pins
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'map_pin', remote_id, OLD.name FROM sync_state
+     WHERE entity_type = 'map_pin' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'map_pin' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_family_member AFTER DELETE ON family_members
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'family_member', remote_id, OLD.given_name || COALESCE(' ' || OLD.surname, '') FROM sync_state
+     WHERE entity_type = 'family_member' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'family_member' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_album AFTER DELETE ON albums
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'album', remote_id, OLD.name FROM sync_state
+     WHERE entity_type = 'album' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'album' AND local_id = OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_tombstone_media AFTER DELETE ON media
+BEGIN
+  INSERT OR IGNORE INTO sync_deletions (entity_type, remote_id, label)
+    SELECT 'media', remote_id, OLD.filename FROM sync_state
+     WHERE entity_type = 'media' AND local_id = OLD.id AND remote_id IS NOT NULL;
+  DELETE FROM sync_state WHERE entity_type = 'media' AND local_id = OLD.id;
+END;
 `,
   ],
 ];

@@ -105,6 +105,16 @@ The whole route tree lives in [src/routes/index.tsx](../src/routes/index.tsx). E
 - **Images** the user adds are copied into `%LOCALAPPDATA%\com.lifescribe.app\images` ([src/lib/images.ts](../src/lib/images.ts)), named by content hash. Settings has a button to copy older, path-referenced photos in.
 - **Testing the data layer**: functions take a `SqlRunner` ([src/lib/data/sql.ts](../src/lib/data/sql.ts)); tests use `createTestDb()` from `src/lib/data/test-runner.ts`.
 
+### Publishing to the website (optional sync)
+Sync is opt-in. **Refresh** pulls the website into the app; **Review & publish** (Settings) sends changes the other way. Code lives in `src/lib/sync/`:
+- `sync-service.ts` is the engine: `refresh`, `listUnpublished`, `publish`, `listDeletions` / `publishDeletions`, `resolveConflict`. It talks to a `DataStore` (SQLite) and a `WebAdapter` (REST), both interfaces, so it is unit-tested with fakes.
+- `registry.ts` describes each synced type: columns, push-only extras, images, link tables, and what is sent (`PUSH_LINKS`).
+- Publish order: records → album photos and covers → links and family relationships. Photos are uploaded first (`uploadImageFile`), resized if over 10 MB, and remembered by content hash in `uploaded_images`.
+- A database backup (`VACUUM INTO`, newest 10 kept in `%LOCALAPPDATA%\com.lifescribe.app\backups`) is taken before Refresh, Reset, Publish and conflict resolution.
+- Deleting a published record writes a row to `sync_deletions` via triggers (migration 0010); `deleteLocal` clears sync bookkeeping first so website-driven deletions are not recorded.
+- Migrations containing `CREATE TRIGGER` rely on `splitStatements` keeping the trigger body together.
+- The website side is in the LifeScribe repo under `apps/web/src/app/api/v1/sync/` (`pull`, `push`, `media`, `image`, `media-link`, `[entity]/[id]`) and `src/lib/sync/`.
+
 ### Import pipeline
 1. **Photos**: `PhotoImportPage` → Rust `scan_folder`/`batch_process_photos` → rows in `media` (deduped by `import_hash`).
 2. **Archives**: `ArchiveImportPage` → Rust `extract_archive` → `archive-parsers.ts` detects the platform (Facebook / Instagram / LinkedIn) and parses JSON/CSV into `import_items`.

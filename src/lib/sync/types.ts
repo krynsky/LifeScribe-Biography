@@ -43,6 +43,15 @@ export interface RemoteRelationship {
   type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
 }
 
+/** Something deleted in the app that is still on the website, waiting for a publish-time decision. */
+export interface PendingDeletion {
+  id: number;
+  entity_type: EntityType;
+  remote_id: string;
+  label: string;
+  deleted_at: string;
+}
+
 /** A gallery photo/video as publish needs to see it. */
 export interface LocalMedia {
   id: number;
@@ -117,6 +126,10 @@ export interface DataStore {
    * its category (name/color/icon) and tag names. Falls back to getLocal(...).fields when absent.
    */
   getPushFields?(type: EntityType, localId: number): Promise<Record<string, unknown> | null>;
+  /** Records deleted in the app that are still on the website. */
+  listTombstones?(): Promise<PendingDeletion[]>;
+  /** Forget a pending deletion (after removing it from the website, or to let Refresh bring it back). */
+  removeTombstone?(remoteId: string): Promise<void>;
   /** Photos/videos in an album, with the album's chosen cover (media id) if any. */
   listAlbumMedia?(albumLocalId: number): Promise<{ media: LocalMedia[]; coverMediaId: number | null }>;
   /** Remember that a local photo now exists on the website (web id + address). */

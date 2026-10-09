@@ -2,12 +2,14 @@ import { ENTITIES, PUSH_LINKS, entityDef, entityLabel, type EntityType } from ".
 import { decide } from "./reconcile";
 import { LOCAL_IMAGES_NOTE, hasLocalImages, isWebDownloadedImage } from "./local-images";
 import { rewriteLocalImages } from "./story-images";
-import type { DataStore, LinkSetPayload, LocalMedia, RelationshipSetPayload, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
+import type { DataStore, LinkSetPayload, LocalMedia, PendingDeletion, RelationshipSetPayload, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
 
 export interface ConflictItem {
   entity_type: EntityType;
   local_id: number;
   remote_id: string;
+  /** The website's version, kept so the user can compare and choose. */
+  remote?: RemoteRecord;
 }
 
 export interface RefreshSummary {
@@ -16,6 +18,8 @@ export interface RefreshSummary {
   deleted: number;
   conflicts: ConflictItem[];
   errors: string[];
+  /** Website records skipped because they were deleted in the app and are waiting for a decision. */
+  keptDeleted: number;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -51,12 +55,14 @@ export class SyncService {
   ) {}
 
   async refresh(onProgress?: (msg: string) => void): Promise<RefreshSummary> {
-    const summary: RefreshSummary = { created: 0, updated: 0, deleted: 0, conflicts: [], errors: [] };
+    const summary: RefreshSummary = { created: 0, updated: 0, deleted: 0, conflicts: [], errors: [], keptDeleted: 0 };
     if (this.mode === "standalone") return summary;
     this.pendingRelations = [];
 
     onProgress?.("Fetching web content…");
     const remoteByType = await this.adapter.pullAll();
+    // Records you deleted in the app stay deleted until you decide what to do with them on the website.
+    const deletedInApp = new Set(((await this.store.listTombstones?.()) ?? []).map((t) => t.remote_id));
 
     for (const def of ENTITIES) {
       const remotes = remoteByType[def.type] ?? [];
@@ -65,6 +71,10 @@ export class SyncService {
 
       for (const remote of remotes) {
         seenRemoteIds.add(remote.remote_id);
+        if (deletedInApp.has(remote.remote_id)) {
+          summary.keptDeleted++;
+          continue;
+        }
         try {
           await this.applyRemote(def.type, remote, summary, onProgress);
         } catch (e) {
@@ -90,16 +100,7 @@ export class SyncService {
       }
     }
 
-    // Categories, tags and links are applied once every record exists locally, so remote ids
-    // can be resolved to local ids regardless of the order entities were pulled in.
-    for (const p of this.pendingRelations) {
-      try {
-        await this.applyRelations(p.type, p.localId, p.fields);
-      } catch (e) {
-        summary.errors.push(`${p.type}:${p.localId} relations: ${(e as Error).message}`);
-      }
-    }
-    this.pendingRelations = [];
+    await this.applyPendingRelations(summary.errors);
 
     if (this.mode === "web-master") {
       try {
@@ -109,6 +110,83 @@ export class SyncService {
       }
     }
     return summary;
+  }
+
+  /** Apply the categories, tags and links collected while records were pulled (every record exists locally by now). */
+  private async applyPendingRelations(errors: string[]): Promise<void> {
+    for (const p of this.pendingRelations) {
+      try {
+        await this.applyRelations(p.type, p.localId, p.fields);
+      } catch (e) {
+        errors.push(`${p.type}:${p.localId} relations: ${(e as Error).message}`);
+      }
+    }
+    this.pendingRelations = [];
+  }
+
+  /** Things deleted in the app that are still on the website. */
+  async listDeletions(): Promise<PendingDeletion[]> {
+    return (await this.store.listTombstones?.()) ?? [];
+  }
+
+  /**
+   * Remove the chosen records from the website. A record that fails stays on the list so you can
+   * try again; one that is already gone from the website counts as done.
+   */
+  async publishDeletions(ids: number[], onProgress?: (msg: string) => void): Promise<{ removed: number; errors: string[] }> {
+    const result = { removed: 0, errors: [] as string[] };
+    if (this.mode === "standalone") return result;
+    const chosen = (await this.listDeletions()).filter((d) => ids.includes(d.id));
+    for (const d of chosen) {
+      try {
+        onProgress?.(`Removing “${d.label}” from the website…`);
+        await this.adapter.deleteRemote(d.entity_type, d.remote_id);
+        await this.store.removeTombstone?.(d.remote_id);
+        result.removed++;
+      } catch (e) {
+        result.errors.push(`${d.label}: ${(e as Error).message}`);
+      }
+    }
+    return result;
+  }
+
+  /** Stop treating a record as deleted: the next Refresh brings the website's copy back into the app. */
+  async restoreDeleted(remoteId: string): Promise<void> {
+    await this.store.removeTombstone?.(remoteId);
+  }
+
+  /**
+   * Settle a record edited on both sides. "web" replaces your version with the website's; "mine"
+   * accepts that the website changed and publishes your version over it.
+   */
+  async resolveConflict(c: ConflictItem, choice: "mine" | "web", onProgress?: (msg: string) => void): Promise<{ ok: boolean; error?: string }> {
+    if (this.mode === "standalone") return { ok: false, error: "Sync is turned off." };
+    const st = await this.store.getSyncState(c.entity_type, c.local_id);
+    if (!st || !c.remote) return { ok: false, error: "Refresh from web again to compare the two versions." };
+
+    if (choice === "web") {
+      const local = await this.store.getLocal(c.entity_type, c.local_id);
+      // Make your copy look unedited and the website's look newer, so the normal path takes the website's version.
+      await this.store.putSyncState({ ...st, last_synced_at: local?.updated_at ?? nowIso(), last_synced_remote_at: null });
+      const summary: RefreshSummary = { created: 0, updated: 0, deleted: 0, conflicts: [], errors: [], keptDeleted: 0 };
+      this.pendingRelations = [];
+      try {
+        await this.applyRemote(c.entity_type, c.remote, summary, onProgress);
+        await this.applyPendingRelations(summary.errors);
+      } catch (e) {
+        await this.store.putSyncState(st); // put the bookkeeping back so nothing is lost
+        return { ok: false, error: (e as Error).message };
+      }
+      return summary.errors.length ? { ok: false, error: summary.errors.join("; ") } : { ok: true };
+    }
+
+    await this.store.putSyncState({ ...st, last_synced_remote_at: c.remote.remote_updated_at });
+    const res = await this.publish([{ entity_type: c.entity_type, local_id: c.local_id }], onProgress);
+    if (res.errors.length > 0 || res.published === 0) {
+      await this.store.putSyncState(st); // still in conflict
+      return { ok: false, error: res.errors.join("; ") || "The website did not accept the change." };
+    }
+    return { ok: true };
   }
 
   private pendingRelations: Array<{ type: EntityType; localId: number; fields: Record<string, unknown> }> = [];
@@ -508,7 +586,7 @@ export class SyncService {
         break;
       }
       case "conflict": {
-        if (existing) summary.conflicts.push({ entity_type: type, local_id: existing.local_id, remote_id: remote.remote_id });
+        if (existing) summary.conflicts.push({ entity_type: type, local_id: existing.local_id, remote_id: remote.remote_id, remote });
         break;
       }
     }

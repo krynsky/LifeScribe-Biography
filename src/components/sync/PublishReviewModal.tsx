@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import { makeSyncService, type UnpublishedItem } from "@/lib/sync";
+import { makeSyncService, type PendingDeletion, type UnpublishedItem } from "@/lib/sync";
 import { createBackup } from "@/lib/backup";
 
 const SECTION_TITLES: Record<string, string> = {
@@ -30,10 +30,12 @@ interface PublishReviewModalProps {
  */
 export default function PublishReviewModal({ open, onClose, onFinished }: PublishReviewModalProps) {
   const [items, setItems] = useState<UnpublishedItem[] | null>(null);
+  const [deletions, setDeletions] = useState<PendingDeletion[]>([]);
+  const [removeIds, setRemoveIds] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
-  const [result, setResult] = useState<{ published: number; errors: string[]; photos?: number } | null>(null);
+  const [result, setResult] = useState<{ published: number; errors: string[]; photos?: number; removed?: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,10 +44,13 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
     setResult(null);
     setLoadError(null);
     setProgress("");
-    makeSyncService()
-      .listUnpublished()
-      .then((list) => {
+    const svc = makeSyncService();
+    // Deletions start unticked: nothing is removed from the website unless you say so.
+    setRemoveIds(new Set());
+    Promise.all([svc.listUnpublished(), svc.listDeletions()])
+      .then(([list, dels]) => {
         setItems(list);
+        setDeletions(dels);
         setSelected(new Set(list.map(keyOf)));
       })
       .catch((e) => setLoadError(String(e)));
@@ -76,7 +81,8 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
   async function publish() {
     if (!items) return;
     const chosen = items.filter((i) => selected.has(keyOf(i)));
-    if (chosen.length === 0) return;
+    const removing = [...removeIds];
+    if (chosen.length === 0 && removing.length === 0) return;
     setBusy(true);
     setResult(null);
     try {
@@ -87,8 +93,15 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
         setResult({ published: 0, errors: [`Nothing was published, because a safety backup could not be made: ${String(e)}`] });
         return;
       }
-      const res = await makeSyncService().publish(chosen, (msg) => setProgress(msg));
-      setResult(res);
+      const svc = makeSyncService();
+      const res = chosen.length > 0 ? await svc.publish(chosen, (msg) => setProgress(msg)) : { published: 0, errors: [] as string[], photos: 0 };
+      let removed = 0;
+      if (removing.length > 0) {
+        const del = await svc.publishDeletions(removing, (msg) => setProgress(msg));
+        removed = del.removed;
+        res.errors.push(...del.errors);
+      }
+      setResult({ ...res, removed });
     } catch (e) {
       setResult({ published: 0, errors: [String(e)] });
     } finally {
@@ -107,16 +120,18 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
         {loadError && <p className="text-sm" style={{ color: "var(--color-error)" }}>{loadError}</p>}
         {!items && !loadError && <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Checking what has changed…</p>}
 
-        {items && items.length === 0 && !result && (
+        {items && items.length === 0 && deletions.length === 0 && !result && (
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>Everything is up to date with your website.</p>
         )}
 
-        {items && items.length > 0 && !result && (
+        {items && (items.length > 0 || deletions.length > 0) && !result && (
           <>
+            {items.length > 0 && (
             <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
               These will be sent to your website. <strong>New</strong> items are created there; <strong>changed</strong> items update the version on your site. Untick anything you want to keep local for now.
               Text, dates, categories, tags, links, family relationships and photos are sent. Photos from this computer are uploaded to your website, so publishing photos can take a while.
             </p>
+            )}
             <div className="space-y-4">
               {groups.map((g) => (
                 <section key={g.type}>
@@ -153,6 +168,48 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
                 </section>
               ))}
             </div>
+
+            {deletions.length > 0 && (
+              <section className={items.length > 0 ? "mt-6 pt-4 border-t" : ""} style={{ borderColor: "var(--color-border)" }}>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--color-text)" }}>
+                  Deleted in the app, still on your website ({deletions.length})
+                </h3>
+                <p className="text-xs mb-2" style={{ color: "var(--color-text-muted)" }}>
+                  Tick anything you also want removed from the website. Unticked items stay on the website and are not brought back into the app unless you choose “Bring back”.
+                </p>
+                <ul className="space-y-1">
+                  {deletions.map((d) => (
+                    <li key={d.id} className="flex items-center gap-2 text-sm" style={{ color: "var(--color-text)" }}>
+                      <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={removeIds.has(d.id)}
+                          onChange={() => {
+                            const next = new Set(removeIds);
+                            if (next.has(d.id)) next.delete(d.id);
+                            else next.add(d.id);
+                            setRemoveIds(next);
+                          }}
+                        />
+                        <span className="truncate">{SECTION_TITLES[d.entity_type] ?? d.entity_type}: {d.label}</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="text-xs"
+                        style={{ color: "var(--color-primary)" }}
+                        onClick={async () => {
+                          await makeSyncService().restoreDeleted(d.remote_id);
+                          setDeletions((list) => list.filter((x) => x.id !== d.id));
+                        }}
+                        title="Forget the deletion; the next Refresh puts it back in the app"
+                      >
+                        Bring back
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         )}
 
@@ -161,6 +218,7 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
             <p className="text-sm font-medium" style={{ color: result.published > 0 ? "var(--color-success)" : "var(--color-text)" }}>
               Published {result.published} item{result.published === 1 ? "" : "s"}
               {result.photos ? ` and uploaded ${result.photos} photo${result.photos === 1 ? "" : "s"}` : ""}.
+              {result.removed ? ` Removed ${result.removed} from the website.` : ""}
             </p>
             {result.errors.length > 0 && (
               <div>
@@ -184,15 +242,15 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
       </div>
 
       <div className="flex items-center gap-3 mt-4 pt-3 border-t" style={{ borderColor: "var(--color-border)" }}>
-        {!result && items && items.length > 0 && (
+        {!result && items && (items.length > 0 || deletions.length > 0) && (
           <button
             onClick={() => void publish()}
-            disabled={busy || selected.size === 0}
+            disabled={busy || (selected.size === 0 && removeIds.size === 0)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-50"
             style={{ background: "var(--color-primary)" }}
           >
             {busy && <Loader2 size={13} className="animate-spin" />}
-            {busy ? "Publishing…" : `Publish ${selected.size} item${selected.size === 1 ? "" : "s"}${newCount || changedCount ? ` (${newCount} new, ${changedCount} changed)` : ""}`}
+            {busy ? "Publishing…" : `${selected.size > 0 ? `Publish ${selected.size} item${selected.size === 1 ? "" : "s"}${newCount || changedCount ? ` (${newCount} new, ${changedCount} changed)` : ""}` : "Continue"}${removeIds.size > 0 ? `${selected.size > 0 ? " and remove" : " — remove"} ${removeIds.size} from the website` : ""}`}
           </button>
         )}
         <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg text-sm border disabled:opacity-50" style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}>

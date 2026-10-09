@@ -11,6 +11,7 @@ import { testConnection, type RemoteProfile } from "@/lib/sync/web-profile";
 import { copyReferencedPhotosIntoLibrary } from "@/lib/actions/library";
 import { createBackup } from "@/lib/backup";
 import PublishReviewModal from "@/components/sync/PublishReviewModal";
+import ConflictsModal from "@/components/sync/ConflictsModal";
 
 export default function SettingsPage() {
   // Photo library migration
@@ -47,6 +48,8 @@ export default function SettingsPage() {
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [unpublished, setUnpublished] = useState<Array<{ entity_type: string; local_id: number }>>([]);
   const [showPublish, setShowPublish] = useState(false);
+  const [showConflicts, setShowConflicts] = useState(false);
+  const [deletionCount, setDeletionCount] = useState(0);
 
   useEffect(() => {
     setApiKey(getApiKey());
@@ -56,7 +59,9 @@ export default function SettingsPage() {
       testConnection()
         .then(setSyncProfile)
         .catch(() => setSyncProfile(null));
-      makeSyncService().listUnpublished().then(setUnpublished).catch(() => {});
+      const svc = makeSyncService();
+      svc.listUnpublished().then(setUnpublished).catch(() => {});
+      svc.listDeletions().then((d) => setDeletionCount(d.length)).catch(() => {});
     }
   }, []);
 
@@ -107,8 +112,9 @@ export default function SettingsPage() {
       const summary = await svc.refresh((msg) => setSyncStatus(msg));
       setConflicts(summary.conflicts);
       setUnpublished(await svc.listUnpublished());
+      setDeletionCount((await svc.listDeletions()).length);
       setSyncResult({ pushed: 0, pulled: summary.created + summary.updated, conflicts: summary.conflicts.map((c) => `${c.entity_type}:${c.remote_id}`) });
-      setSyncStatus(`Refreshed — ${summary.created} new, ${summary.updated} updated, ${summary.deleted} removed, ${summary.conflicts.length} conflicts`);
+      setSyncStatus(`Refreshed — ${summary.created} new, ${summary.updated} updated, ${summary.deleted} removed, ${summary.conflicts.length} conflicts${summary.keptDeleted ? ` · ${summary.keptDeleted} you deleted are waiting in Review & publish` : ""}`);
     } catch (err) {
       setSyncStatus("Refresh failed: " + String(err));
     } finally {
@@ -135,7 +141,9 @@ export default function SettingsPage() {
 
   async function refreshUnpublished() {
     try {
-      setUnpublished(await makeSyncService().listUnpublished());
+      const svc = makeSyncService();
+      setUnpublished(await svc.listUnpublished());
+      setDeletionCount((await svc.listDeletions()).length);
     } catch {
       /* the count is informational */
     }
@@ -145,6 +153,15 @@ export default function SettingsPage() {
     <div className="p-8 max-w-2xl">
       <PageHeader title="Settings" />
 
+      <ConflictsModal
+        open={showConflicts}
+        conflicts={conflicts}
+        onClose={() => setShowConflicts(false)}
+        onChanged={(remaining) => {
+          setConflicts(remaining);
+          void refreshUnpublished();
+        }}
+      />
       <PublishReviewModal open={showPublish} onClose={() => setShowPublish(false)} onFinished={() => void refreshUnpublished()} />
 
       <div className="space-y-6">
@@ -253,7 +270,7 @@ export default function SettingsPage() {
                       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-50"
                       style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
                       title="Review and send your new and changed items to your website">
-                      Review &amp; publish{unpublished.length ? ` (${unpublished.length})` : ""}
+                      Review &amp; publish{unpublished.length + deletionCount ? ` (${unpublished.length + deletionCount})` : ""}
                     </button>
                     <button onClick={handleResetRefresh} disabled={syncing}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border disabled:opacity-60"
@@ -270,13 +287,16 @@ export default function SettingsPage() {
                 )}
 
                 {conflicts.length > 0 && (
-                  <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "var(--color-border)" }}>
+                  <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "#F59E0B" }}>
                     <div className="font-medium mb-1" style={{ color: "var(--color-text)" }}>
-                      {conflicts.length} conflict{conflicts.length === 1 ? "" : "s"} — edited on both sides
+                      {conflicts.length} item{conflicts.length === 1 ? " was" : "s were"} edited in the app and on the website
                     </div>
-                    <div style={{ color: "var(--color-text-muted)" }}>
-                      Resolve by either re-pulling (keep web) or publishing (keep your version) the affected items.
+                    <div className="mb-2" style={{ color: "var(--color-text-muted)" }}>
+                      Nothing was overwritten. Compare the two versions and choose which to keep.
                     </div>
+                    <button onClick={() => setShowConflicts(true)} className="px-3 py-1.5 rounded-lg text-sm text-white" style={{ background: "var(--color-primary)" }}>
+                      Compare &amp; resolve
+                    </button>
                   </div>
                 )}
               </div>

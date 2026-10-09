@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SyncService } from "./sync-service";
-import type { DataStore, WebAdapter, LocalRecord, SyncState, RemoteRecord } from "./types";
+import type { DataStore, WebAdapter, LocalRecord, SyncState, RemoteRecord, PendingDeletion } from "./types";
 import type { EntityType } from "./registry";
 
 class FakeStore implements DataStore {
@@ -13,6 +13,8 @@ class FakeStore implements DataStore {
   getLinkedLocalIds?: DataStore["getLinkedLocalIds"];
   listFamilyRelationships?: DataStore["listFamilyRelationships"];
   listAlbumMedia?: DataStore["listAlbumMedia"];
+  listTombstones?: DataStore["listTombstones"];
+  removeTombstone?: DataStore["removeTombstone"];
   recordMediaUploaded?: DataStore["recordMediaUploaded"];
   setTags?: DataStore["setTags"];
   replaceLinks?: DataStore["replaceLinks"];
@@ -71,7 +73,7 @@ class FakeAdapter implements WebAdapter {
     for (const r of records) { remoteIdMap[r.local_id] = r.remote_id ?? `new-${r.local_id}`; remoteUpdatedAt[r.local_id] = "2026-01-03T00:00:00.000Z"; }
     return { remoteIdMap, remoteUpdatedAt, conflicts: [] as string[] };
   }
-  async deleteRemote() { this.writeCalls++; }
+  async deleteRemote(_type: EntityType = "story", _remoteId: string = "") { this.writeCalls++; }
   async downloadMedia() { return "/local/x.jpg"; }
 }
 
@@ -624,5 +626,118 @@ describe("SyncService.publish — album photos and cover", () => {
     const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "album", local_id: 1 }]);
     expect(res.photos).toBe(1);
     expect(res.errors).toEqual(["media:1 bad.jpg: Could not read the photo file."]);
+  });
+});
+
+describe("SyncService — deletions made in the app", () => {
+  const tomb = (id: number, type: EntityType, remote_id: string, label: string): PendingDeletion => ({ id, entity_type: type, remote_id, label, deleted_at: "2026-01-01" });
+
+  function withTombs(list: PendingDeletion[]) {
+    const store = new FakeStore();
+    store.listTombstones = async () => list;
+    store.removeTombstone = async (rid) => { const i = list.findIndex((t) => t.remote_id === rid); if (i >= 0) list.splice(i, 1); };
+    return store;
+  }
+
+  it("Refresh does not bring back a record you deleted in the app", async () => {
+    const store = withTombs([tomb(1, "story", "gone", "Old story")]);
+    const adapter = new FakeAdapter({
+      story: [
+        { remote_id: "gone", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "Old story" } },
+        { remote_id: "keep", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "Other" } },
+      ],
+    });
+    const summary = await new SyncService(store, adapter, "web-master").refresh();
+    expect(store.local.story.map((r) => r.fields.title)).toEqual(["Other"]);
+    expect(summary).toMatchObject({ created: 1, keptDeleted: 1 });
+  });
+
+  it("removes only the chosen records from the website and forgets them", async () => {
+    const list = [tomb(1, "story", "r1", "A"), tomb(2, "album", "r2", "B")];
+    const store = withTombs(list);
+    const removed: Array<[string, string]> = [];
+    const adapter = new FakeAdapter();
+    adapter.deleteRemote = async (type, rid) => { removed.push([String(type), String(rid)]); };
+    const svc = new SyncService(store, adapter, "web-master");
+    const res = await svc.publishDeletions([2]);
+    expect(removed).toEqual([["album", "r2"]]);
+    expect(res).toEqual({ removed: 1, errors: [] });
+    expect((await svc.listDeletions()).map((d) => d.label)).toEqual(["A"]); // the unchosen one is still pending
+  });
+
+  it("keeps a record on the list when the website call fails", async () => {
+    const list = [tomb(1, "story", "r1", "A")];
+    const store = withTombs(list);
+    const adapter = new FakeAdapter();
+    adapter.deleteRemote = async () => { throw new Error("API 500"); };
+    const svc = new SyncService(store, adapter, "web-master");
+    const res = await svc.publishDeletions([1]);
+    expect(res.removed).toBe(0);
+    expect(res.errors).toEqual(["A: API 500"]);
+    expect(await svc.listDeletions()).toHaveLength(1);
+  });
+
+  it("lets you bring a deleted record back by forgetting the deletion", async () => {
+    const list = [tomb(1, "story", "r1", "A")];
+    const store = withTombs(list);
+    const svc = new SyncService(store, new FakeAdapter(), "web-master");
+    await svc.restoreDeleted("r1");
+    expect(await svc.listDeletions()).toEqual([]);
+  });
+
+  it("does nothing in standalone mode", async () => {
+    const store = withTombs([tomb(1, "story", "r1", "A")]);
+    const adapter = new FakeAdapter();
+    const res = await new SyncService(store, adapter, "standalone").publishDeletions([1]);
+    expect(res).toEqual({ removed: 0, errors: [] });
+    expect(adapter.writeCalls).toBe(0);
+  });
+});
+
+describe("SyncService — resolving conflicts", () => {
+  const baseState = (): SyncState => ({ entity_type: "story", local_id: 1, remote_id: "r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" });
+
+  async function conflicted() {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "my edit" } }];
+    store.state.story = [baseState()];
+    const adapter = new FakeAdapter({ story: [{ remote_id: "r1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "web edit" } }] });
+    const svc = new SyncService(store, adapter, "web-master");
+    const summary = await svc.refresh();
+    return { store, adapter, svc, conflict: summary.conflicts[0] };
+  }
+
+  it("keeps the website's version of a record when you choose it", async () => {
+    const { store, svc, conflict } = await conflicted();
+    expect(conflict.remote?.fields.title).toBe("web edit");
+    expect(await svc.resolveConflict(conflict, "web")).toEqual({ ok: true });
+    expect(store.local.story[0].fields.title).toBe("web edit");
+    expect(await svc.listUnpublished()).toEqual([]); // nothing left to publish
+  });
+
+  it("publishes your version over the website's when you choose that", async () => {
+    const { store, adapter, svc, conflict } = await conflicted();
+    let sent: { last_synced_remote_at: string | null; fields: Record<string, unknown> } | undefined;
+    adapter.push = async (_t, records) => {
+      sent = records[0];
+      return { remoteIdMap: { 1: "r1" }, remoteUpdatedAt: { 1: "2026-01-04T00:00:00.000Z" }, conflicts: [] };
+    };
+    expect(await svc.resolveConflict(conflict, "mine")).toEqual({ ok: true });
+    expect(sent!.last_synced_remote_at).toBe("2026-01-02T00:00:00.000Z"); // the website's current version is acknowledged
+    expect(store.local.story[0].fields.title).toBe("my edit"); // your text is untouched
+    expect((await store.getSyncState("story", 1))!.last_synced_remote_at).toBe("2026-01-04T00:00:00.000Z");
+  });
+
+  it("leaves the conflict in place when publishing your version fails", async () => {
+    const { store, adapter, svc, conflict } = await conflicted();
+    adapter.push = async () => ({ remoteIdMap: {}, remoteUpdatedAt: {}, conflicts: ["stories:1:stale"] });
+    const res = await svc.resolveConflict(conflict, "mine");
+    expect(res.ok).toBe(false);
+    expect(await store.getSyncState("story", 1)).toEqual(baseState());
+  });
+
+  it("asks for a fresh Refresh when the website's version was not kept", async () => {
+    const { svc, conflict } = await conflicted();
+    expect((await svc.resolveConflict({ ...conflict, remote: undefined }, "web")).ok).toBe(false);
   });
 });

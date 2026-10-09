@@ -4,7 +4,7 @@ import { getLinkedIds, replaceLinks, type LinkTable } from "../data/links";
 import { listRelationships, mergeRelationships } from "../data/family";
 import { getTagNames, setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
 import { entityDef, pushableColumns, writableColumns, type EntityType } from "./registry";
-import type { DataStore, LocalMedia, LocalRecord, SyncState } from "./types";
+import type { DataStore, LocalMedia, LocalRecord, PendingDeletion, SyncState } from "./types";
 
 function toLocalRecord(def: ReturnType<typeof entityDef>, row: Record<string, unknown>): LocalRecord {
   const fields: Record<string, unknown> = {};
@@ -67,6 +67,9 @@ export class SqlDataStore implements DataStore {
 
   async deleteLocal(type: EntityType, localId: number): Promise<void> {
     const def = entityDef(type);
+    // The web deleted this record, so it must not be remembered as "deleted in the app":
+    // clearing its sync bookkeeping first means the deletion trigger finds nothing to record.
+    await execute(`DELETE FROM sync_state WHERE entity_type = ? AND local_id = ?`, [type, localId]);
     await execute(`DELETE FROM ${def.table} WHERE id = ?`, [localId]);
   }
 
@@ -101,6 +104,14 @@ export class SqlDataStore implements DataStore {
       `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
       [album_id, file_size, remote_url, localId]
     );
+  }
+
+  async listTombstones(): Promise<PendingDeletion[]> {
+    return query<PendingDeletion>("SELECT id, entity_type, remote_id, label, deleted_at FROM sync_deletions ORDER BY deleted_at, id");
+  }
+
+  async removeTombstone(remoteId: string): Promise<void> {
+    await execute("DELETE FROM sync_deletions WHERE remote_id = ?", [remoteId]);
   }
 
   async listAlbumMedia(albumLocalId: number): Promise<{ media: LocalMedia[]; coverMediaId: number | null }> {

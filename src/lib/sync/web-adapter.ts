@@ -223,7 +223,12 @@ export class RestWebAdapter implements WebAdapter {
 
   async deleteRemote(type: EntityType, remoteId: string): Promise<void> {
     const def = entityDef(type);
-    await api("DELETE", `/sync/${def.remoteKey}/${remoteId}`);
+    try {
+      await api("DELETE", `/sync/${def.remoteKey}/${remoteId}`);
+    } catch (e) {
+      // Already gone from the website counts as done.
+      if (!/^API 404/.test((e as Error).message)) throw e;
+    }
   }
 
   async downloadMedia(remote: RemoteRecord): Promise<string> {
