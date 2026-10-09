@@ -1,48 +1,16 @@
 import { query, execute } from "../db";
 import type { Album, Media } from "../models";
 import { CATEGORY_SELECT, categoryJoin, tagsSelect } from "../data/select";
+import { appRunner } from "../data/sql";
+import { setTags } from "../data/taxonomy";
+import * as galleryData from "../data/gallery";
 
 // Albums
 
-export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
-  // 1) Albums with their media counts (simple, no correlated subquery).
-  const albums = await query<Album & { media_count: number }>(
-    `SELECT a.*, ${CATEGORY_SELECT}, ${tagsSelect("album", "a")}, COUNT(m.id) as media_count
-       FROM albums a
-       ${categoryJoin("a")}
-       LEFT JOIN media m ON m.album_id = a.id
-       GROUP BY a.id
-       ORDER BY COALESCE(a.position, 1000000), a.created_at DESC`
-  );
+export type AlbumListItem = galleryData.AlbumListItem;
 
-  // 2) Resolve each album's cover with a plain parameterized query. This avoids
-  // a correlated subquery referencing a.cover_image, which the app's SQLite
-  // (sqlx) rejects. Prefer the explicit cover (remote_url == cover_image),
-  // else the first photo.
-  const result: (Album & { media_count: number; cover_path: string | null })[] = [];
-  for (const a of albums) {
-    const coverImage = (a as { cover_image?: string | null }).cover_image ?? null;
-    let cover: { thumbnail_path: string }[] = [];
-    try {
-      cover = await query<{ thumbnail_path: string }>(
-        `SELECT thumbnail_path FROM media
-           WHERE album_id = ? AND thumbnail_path IS NOT NULL
-           ORDER BY CASE WHEN ? IS NOT NULL AND remote_url = ? THEN 0 ELSE 1 END, sort_order, id
-           LIMIT 1`,
-        [a.id, coverImage, coverImage]
-      );
-    } catch {
-      // remote_url column may not exist (pre-migration) — fall back to first photo.
-      cover = await query<{ thumbnail_path: string }>(
-        `SELECT thumbnail_path FROM media
-           WHERE album_id = ? AND thumbnail_path IS NOT NULL
-           ORDER BY sort_order, id LIMIT 1`,
-        [a.id]
-      );
-    }
-    result.push({ ...a, cover_path: cover[0]?.thumbnail_path ?? null });
-  }
-  return result;
+export function listAlbums(): Promise<AlbumListItem[]> {
+  return galleryData.listAlbumsWithCovers(appRunner);
 }
 
 export async function getAlbum(id: number): Promise<Album | null> {
@@ -53,37 +21,44 @@ export async function getAlbum(id: number): Promise<Album | null> {
   return rows[0] ?? null;
 }
 
-export async function createAlbum(data: {
+export interface AlbumInput {
   name: string;
-  description?: string;
-  date_from?: string;
-  date_to?: string;
-}): Promise<Album> {
+  description?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  category_id?: number | null;
+  /** Tag names; the album's tags become exactly these. */
+  tags?: string[];
+}
+
+export async function createAlbum(data: AlbumInput): Promise<Album> {
   const result = await execute(
-    "INSERT INTO albums (name, description, date_from, date_to) VALUES (?, ?, ?, ?)",
-    [data.name, data.description ?? null, data.date_from ?? null, data.date_to ?? null]
+    "INSERT INTO albums (name, description, date_from, date_to, category_id) VALUES (?, ?, ?, ?, ?)",
+    [data.name, data.description ?? null, data.date_from ?? null, data.date_to ?? null, data.category_id ?? null]
   );
+  if (data.tags) await setTags(appRunner, "albums", result.lastInsertId, data.tags);
   return (await getAlbum(result.lastInsertId))!;
 }
 
-export async function updateAlbum(
-  id: number,
-  data: { name?: string; description?: string; cover_media_id?: number | null }
-): Promise<Album> {
-  const fields = Object.keys(data) as (keyof typeof data)[];
-  if (fields.length === 0) return (await getAlbum(id))!;
+export async function updateAlbum(id: number, data: Partial<AlbumInput> & { cover_media_id?: number | null }): Promise<Album> {
+  const { tags, ...rest } = data;
+  if (tags) await setTags(appRunner, "albums", id, tags);
+  const fields = Object.keys(rest) as (keyof typeof rest)[];
+  if (fields.length === 0) {
+    if (tags) await execute("UPDATE albums SET updated_at = datetime('now') WHERE id = ?", [id]);
+    return (await getAlbum(id))!;
+  }
   const setClauses = fields.map((f) => `${f} = ?`).join(", ");
-  const values = fields.map((f) => data[f]);
-  await execute(
-    `UPDATE albums SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`,
-    [...values, id]
-  );
+  const values = fields.map((f) => rest[f]);
+  await execute(`UPDATE albums SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`, [...values, id]);
   return (await getAlbum(id))!;
 }
 
-export async function deleteAlbum(id: number): Promise<void> {
-  await execute("DELETE FROM albums WHERE id = ?", [id]);
-}
+/** Deletes the album but keeps its photos (they just leave the album), like the web. */
+export const deleteAlbum = (id: number) => galleryData.deleteAlbum(appRunner, id);
+
+/** Choose which photo represents the album (null clears the choice). */
+export const setAlbumCover = (albumId: number, mediaId: number | null) => galleryData.setAlbumCover(appRunner, albumId, mediaId);
 
 // Media
 
@@ -137,13 +112,17 @@ export async function insertMedia(data: {
   album_id?: number;
   import_source?: string;
   import_hash?: string;
+  /** Video media: the embed URL played in the lightbox (YouTube, Vimeo…). */
+  source_url?: string;
+  /** The web URL this media came from, when added by link. */
+  remote_url?: string;
 }): Promise<Media> {
   const result = await execute(
     `INSERT OR IGNORE INTO media
       (file_path, thumbnail_path, filename, title, caption, width, height,
        file_size, mime_type, taken_at, camera_make, camera_model,
-       latitude, longitude, album_id, import_source, import_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       latitude, longitude, album_id, import_source, import_hash, source_url, remote_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.file_path,
       data.thumbnail_path ?? null,
@@ -162,6 +141,8 @@ export async function insertMedia(data: {
       data.album_id ?? null,
       data.import_source ?? null,
       data.import_hash ?? null,
+      data.source_url ?? null,
+      data.remote_url ?? null,
     ]
   );
   // INSERT OR IGNORE: a duplicate import_hash inserts nothing, and lastInsertId
@@ -177,7 +158,7 @@ export async function insertMedia(data: {
 
 export async function updateMedia(
   id: number,
-  data: { title?: string; caption?: string; album_id?: number | null; is_favorite?: boolean }
+  data: { title?: string | null; caption?: string | null; album_id?: number | null; is_favorite?: boolean }
 ): Promise<Media> {
   const fields = Object.keys(data) as (keyof typeof data)[];
   if (fields.length === 0) return (await getMedia(id))!;
@@ -190,9 +171,7 @@ export async function updateMedia(
   return (await getMedia(id))!;
 }
 
-export async function deleteMedia(id: number): Promise<void> {
-  await execute("DELETE FROM media WHERE id = ?", [id]);
-}
+export const deleteMedia = (id: number) => galleryData.deleteMedia(appRunner, id);
 
 export async function checkMediaExists(importHash: string): Promise<boolean> {
   const rows = await query<{ id: number }>(

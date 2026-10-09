@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Image, X, ChevronLeft, ChevronRight, Play } from "lucide-react";
-import { localFileUrl } from "@/lib/db";
+import { imageSrc } from "@/lib/image-src";
 import type { Media } from "@/lib/models";
 
 interface AlbumGridProps {
   photos: Media[];
   emptyMessage?: string;
+  /** Per-photo controls drawn over the tile (edit mode: caption, cover, delete). */
+  renderActions?: (photo: Media) => React.ReactNode;
+  /** Photo to mark with a "Cover" badge. */
+  coverMediaId?: number | null;
 }
 
-export default function AlbumGrid({ photos, emptyMessage = "No photos in this album." }: AlbumGridProps) {
+export default function AlbumGrid({ photos, emptyMessage = "No photos in this album.", renderActions, coverMediaId }: AlbumGridProps) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -37,15 +41,16 @@ export default function AlbumGrid({ photos, emptyMessage = "No photos in this al
     <>
       <div className="grid grid-cols-4 gap-3">
         {photos.map((photo, idx) => (
+          <div key={photo.id} className="relative group">
           <button
-            key={photo.id}
             onClick={() => setLightboxIdx(idx)}
-            className="relative aspect-square rounded-lg overflow-hidden border hover:opacity-90 transition-opacity"
+            aria-label={`View ${photo.title ?? photo.filename}`}
+            className="relative w-full aspect-square rounded-lg overflow-hidden border hover:opacity-90 transition-opacity"
             style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
           >
-            {photo.thumbnail_path ? (
+            {imageSrc(photo.thumbnail_path ?? (photo.source_url ? null : photo.file_path)) ? (
               <img
-                src={localFileUrl(photo.thumbnail_path)}
+                src={imageSrc(photo.thumbnail_path ?? photo.file_path)!}
                 alt={photo.title ?? photo.filename}
                 className="w-full h-full object-cover"
               />
@@ -64,7 +69,23 @@ export default function AlbumGrid({ photos, emptyMessage = "No photos in this al
                 </span>
               </span>
             )}
+            {coverMediaId === photo.id && (
+              <span className="absolute left-1.5 top-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white" style={{ background: "var(--color-primary)" }}>
+                Cover
+              </span>
+            )}
           </button>
+          {renderActions && (
+            <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              {renderActions(photo)}
+            </div>
+          )}
+          {photo.caption && renderActions && (
+            <div className="absolute left-0 right-0 bottom-0 px-2 py-1 text-[11px] truncate rounded-b-lg text-white" style={{ background: "rgba(0,0,0,0.5)" }}>
+              {photo.caption}
+            </div>
+          )}
+          </div>
         ))}
       </div>
 
@@ -102,7 +123,7 @@ export default function AlbumGrid({ photos, emptyMessage = "No photos in this al
               />
             ) : (
               <img
-                src={localFileUrl(lightboxPhoto.file_path)}
+                src={imageSrc(lightboxPhoto.file_path) ?? ""}
                 alt={lightboxPhoto.title ?? lightboxPhoto.filename}
                 className="max-w-full max-h-[80vh] object-contain rounded-lg"
               />

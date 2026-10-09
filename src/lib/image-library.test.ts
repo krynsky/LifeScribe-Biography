@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { hashBytes, imageExtension, isInsideLibrary, libraryFileName } from "./image-library";
+import { hashBytes, imageExtension, imageMimeType, isInsideLibrary, isSupportedImage, libraryFileName } from "./image-library";
+
+describe("mime and support checks", () => {
+  it("maps extensions to mime types", () => {
+    expect(imageMimeType("a.JPG")).toBe("image/jpeg");
+    expect(imageMimeType("a.png")).toBe("image/png");
+    expect(imageMimeType("a.webp")).toBe("image/webp");
+  });
+  it("only accepts supported image files", () => {
+    expect(isSupportedImage("C:\\x\\a.PNG")).toBe(true);
+    expect(isSupportedImage("notes.txt")).toBe(false);
+    expect(isSupportedImage("noext")).toBe(false);
+  });
+});
 
 describe("image library helpers", () => {
   it("normalizes extensions and defaults unknown ones to jpg", () => {

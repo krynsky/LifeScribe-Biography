@@ -30,3 +30,16 @@ export function isInsideLibrary(path: string, libraryDir: string): boolean {
   const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
   return norm(path).startsWith(norm(libraryDir) + "/");
 }
+
+/** MIME type for an image path, from its extension (defaults to jpeg). */
+export function imageMimeType(path: string): string {
+  const ext = imageExtension(path);
+  return ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+}
+
+/** True when the path has a supported image extension. */
+export function isSupportedImage(path: string): boolean {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  return (IMAGE_EXTENSIONS as readonly string[]).includes(ext);
+}

@@ -21,6 +21,7 @@ describe("parseVimeoUrl", () => {
     expect(parseVimeoUrl("https://vimeo.com/123456")?.embedUrl).toBe("https://player.vimeo.com/video/123456");
     expect(parseVimeoUrl("https://vimeo.com/123456/abcdef12")?.embedUrl).toBe("https://player.vimeo.com/video/123456?h=abcdef12");
     expect(parseVimeoUrl("https://player.vimeo.com/video/987")?.videoId).toBe("987");
+    expect(parseVimeoUrl("https://vimeo.com/123456/abcdef12")?.oembedUrl).toBe("https://vimeo.com/123456/abcdef12");
     expect(parseVimeoUrl("https://example.com/123")).toBeNull();
   });
 });

@@ -31,7 +31,8 @@
         { "url": "https://lifescribe.us/**" },
         { "url": "https://files.lifescribe.us/**" },
         { "url": "https://img.youtube.com/**" },
-        { "url": "https://nominatim.openstreetmap.org/**" }
+        { "url": "https://nominatim.openstreetmap.org/**" },
+        { "url": "https://vimeo.com/api/oembed.json*" }
       ]
     },
     "sql:default",

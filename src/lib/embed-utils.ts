@@ -25,7 +25,7 @@ export function parseYouTubeUrl(url: string): { embedUrl: string; videoId: strin
 }
 
 /** vimeo.com/{id}, unlisted /{id}/{hash}, channels, groups and player URLs → video id + embed URL. */
-export function parseVimeoUrl(url: string): { embedUrl: string; videoId: string } | null {
+export function parseVimeoUrl(url: string): { embedUrl: string; videoId: string; oembedUrl: string } | null {
   try {
     const u = new URL(url);
     if (!u.hostname.includes("vimeo.com")) return null;
@@ -43,6 +43,8 @@ export function parseVimeoUrl(url: string): { embedUrl: string; videoId: string 
     return {
       videoId,
       embedUrl: `https://player.vimeo.com/video/${videoId}${hash ? `?h=${hash}` : ""}`,
+      // Lookup URL for Vimeo's oEmbed (thumbnail); includes the privacy hash for unlisted videos.
+      oembedUrl: `https://vimeo.com/${videoId}${hash ? `/${hash}` : ""}`,
     };
   } catch {
     return null;
