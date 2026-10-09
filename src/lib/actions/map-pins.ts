@@ -1,12 +1,18 @@
 import { query, execute } from "../db";
 import type { MapPin } from "../models";
+import { CATEGORY_SELECT, categoryJoin } from "../data/select";
 
 export async function listMapPins(): Promise<MapPin[]> {
-  return query<MapPin>("SELECT * FROM map_pins ORDER BY COALESCE(position, 1000000), COALESCE(visit_date, created_at) DESC");
+  return query<MapPin>(
+    `SELECT p.*, ${CATEGORY_SELECT} FROM map_pins p ${categoryJoin("p")} ORDER BY COALESCE(p.position, 1000000), COALESCE(p.visit_date, p.created_at) DESC`
+  );
 }
 
 export async function getMapPin(id: number): Promise<MapPin | null> {
-  const rows = await query<MapPin>("SELECT * FROM map_pins WHERE id = ?", [id]);
+  const rows = await query<MapPin>(
+    `SELECT p.*, ${CATEGORY_SELECT} FROM map_pins p ${categoryJoin("p")} WHERE p.id = ?`,
+    [id]
+  );
   return rows[0] ?? null;
 }
 

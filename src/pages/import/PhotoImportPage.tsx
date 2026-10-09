@@ -7,6 +7,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { ArrowLeft, Camera, FolderOpen, Loader2, CheckCircle, Circle, AlertCircle, Plus } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { insertMedia, createAlbum, listAlbums, checkMediaExists } from "@/lib/actions/gallery";
+import { copyIntoLibrary } from "@/lib/images";
 import type { Album } from "@/lib/models";
 
 // ── Rust types ─────────────────────────────────────────────────────────────
@@ -240,8 +241,14 @@ export default function PhotoImportPage() {
         webp: "image/webp", gif: "image/gif", bmp: "image/bmp",
         tiff: "image/tiff", tif: "image/tiff", heic: "image/heic",
       };
+      // Copy the original into the app's image library so the biography is self-contained;
+      // fall back to referencing the original if the copy fails.
+      const storedPath = await copyIntoLibrary(p.scanned.path).catch((err) => {
+        console.error("Could not copy photo into library:", err);
+        return p.scanned.path;
+      });
       await insertMedia({
-        file_path: p.scanned.path,
+        file_path: storedPath,
         thumbnail_path: p.thumbnail ?? undefined,
         filename,
         width: p.exif?.width ?? undefined,

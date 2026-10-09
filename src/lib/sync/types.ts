@@ -1,3 +1,4 @@
+import type { LinkTable } from "../data/links";
 import type { EntityType } from "./registry";
 
 export type SyncMode = "web-master" | "app-master" | "standalone";
@@ -70,6 +71,12 @@ export interface DataStore {
     remote_url: string | null
   ): Promise<void>;
 
+  /** Assign (or clear, with null) the category of a local row, creating the category when new. */
+  setCategory?(type: EntityType, localId: number, cat: { name: string; color: string | null; icon: string | null } | null): Promise<void>;
+  /** Replace a local row's tags with exactly these names. */
+  setTags?(type: EntityType, localId: number, names: string[]): Promise<void>;
+  /** Replace one owner's rows in a link table. */
+  replaceLinks?(table: LinkTable, ownerCol: string, ownerId: number, otherIds: number[]): Promise<void>;
   /** Replace all family relationships with the given local-id pairs (web is the source of truth). */
   replaceFamilyRelationships?(
     rels: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>

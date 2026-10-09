@@ -1,15 +1,19 @@
 import { query, execute } from "../db";
 import type { CareerEntry } from "../models";
+import { CATEGORY_SELECT, categoryJoin } from "../data/select";
 
 export async function listCareerEntries(): Promise<CareerEntry[]> {
   return query<CareerEntry>(
-    `SELECT * FROM career_entries
-     ORDER BY is_current DESC, COALESCE(start_date, '0000') DESC`
+    `SELECT e.*, ${CATEGORY_SELECT} FROM career_entries e ${categoryJoin("e")}
+     ORDER BY e.is_current DESC, COALESCE(e.start_date, '0000') DESC`
   );
 }
 
 export async function getCareerEntry(id: number): Promise<CareerEntry | null> {
-  const rows = await query<CareerEntry>("SELECT * FROM career_entries WHERE id = ?", [id]);
+  const rows = await query<CareerEntry>(
+    `SELECT e.*, ${CATEGORY_SELECT} FROM career_entries e ${categoryJoin("e")} WHERE e.id = ?`,
+    [id]
+  );
   return rows[0] ?? null;
 }
 

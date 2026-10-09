@@ -1,7 +1,7 @@
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
 import { exists, mkdir, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch } from "@tauri-apps/plugin-http";
-import { ENTITIES, entityDef, writableColumns, type EntityType } from "./registry";
+import { ENTITIES, entityDef, relationFields, writableColumns, type EntityType } from "./registry";
 import { getSyncToken, getSyncUrl } from "./config";
 import type { RemoteRecord, RemoteRelationship, WebAdapter } from "./types";
 
@@ -50,6 +50,10 @@ function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<s
     // Web-owned extras: copy only what the API actually sent so older servers don't blank local data.
     for (const c of writableColumns(def)) {
       if (!def.columns.includes(c) && c in r) fields[c] = normalizeExtra(r[c]);
+    }
+    // Category / tags / link refs are carried as-is (objects and arrays) for the relation pass.
+    for (const f of relationFields(def)) {
+      if (f in r) fields[f] = r[f];
     }
     for (const img of def.images ?? []) {
       if (img.remoteField in r) fields[img.remoteField] = r[img.remoteField] ?? null;

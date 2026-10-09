@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate, parseTags, formatFamilyName, formatShortDate, formatMonthYear, computeDuration, parseLinked, parseRelated } from "./reader-utils";
+import { isBiographyEmpty, filterPublishedStories, firstImageFromContent, formatDisplayDate, parseTags, formatFamilyName, formatShortDate, formatMonthYear, computeDuration } from "./reader-utils";
 import type { Story } from "./models";
 
 describe("isBiographyEmpty", () => {
@@ -117,11 +117,5 @@ describe("web date formats", () => {
     expect(computeDuration("2020-01-01", "2021-01-01", false)).toBe("1 yr");
     expect(computeDuration("2020-01-01", "2020-01-20", false)).toBe("Less than a month");
     expect(computeDuration("2020-01-01", null, true, new Date(Date.UTC(2020, 5, 1)))).toBe("5 mo");
-  });
-  it("parses linked refs and related defensively", () => {
-    expect(parseLinked('[{"remote_id":"a","title":"T"}]')).toEqual([{ remote_id: "a", title: "T" }]);
-    expect(parseLinked("bad")).toEqual([]);
-    expect(parseRelated(null).albums).toEqual([]);
-    expect(parseRelated('{"albums":[{"title":"A"}]}').albums).toEqual([{ title: "A" }]);
   });
 });

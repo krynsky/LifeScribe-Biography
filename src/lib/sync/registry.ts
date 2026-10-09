@@ -1,3 +1,5 @@
+import type { LinkTable } from "../data/links";
+
 export type EntityType =
   | "biography"
   | "story"
@@ -27,6 +29,34 @@ export interface EntityDef {
   extraColumns?: string[];
   /** Remote image URLs downloaded to local files during refresh. */
   images?: ImageDef[];
+  /** True when the web record can carry a category (name/color/icon) that maps to a local category. */
+  categorized?: boolean;
+  /** True when the web record carries a `tags` array of names. */
+  tagged?: boolean;
+  /** Link tables this record's pulled data populates (it is the "owner" side of each). */
+  links?: LinkSpec[];
+}
+
+/** How a pulled field of `[{remote_id}]` refs becomes rows in a local link table. */
+export interface LinkSpec {
+  /** Dotted path within the pulled fields, e.g. "linked_stories" or "related.albums". */
+  field: string;
+  table: LinkTable;
+  /** Column of `table` holding this record's local id. */
+  ownerCol: string;
+  /** Column of `table` holding the linked record's local id. */
+  otherCol: string;
+  /** Entity type whose sync_state resolves remote ids to local ids. */
+  otherType: EntityType;
+}
+
+/** Pulled fields that feed categories, tags and links rather than being stored as columns. */
+export function relationFields(def: EntityDef): string[] {
+  const out: string[] = [];
+  if (def.categorized) out.push("category", "category_color", "category_icon");
+  if (def.tagged) out.push("tags");
+  for (const l of def.links ?? []) out.push(l.field.split(".")[0]);
+  return [...new Set(out)];
 }
 
 export interface ImageDef {
@@ -35,8 +65,6 @@ export interface ImageDef {
   /** Local column receiving the downloaded file path. */
   pathColumn: string;
 }
-
-const CATEGORY_COLUMNS = ["category", "category_color", "category_icon"];
 
 export const ENTITIES: EntityDef[] = [
   {
@@ -55,33 +83,47 @@ export const ENTITIES: EntityDef[] = [
     table: "stories",
     remoteKey: "stories",
     columns: ["title", "slug", "content", "excerpt", "status", "event_date", "event_date_precision"],
-    extraColumns: [...CATEGORY_COLUMNS, "tags", "author_name", "related"],
+    extraColumns: ["author_name"],
     images: [{ remoteField: "featured_image_url", pathColumn: "featured_image_path" }],
+    categorized: true,
+    tagged: true,
+    links: [{ field: "related.albums", table: "story_albums", ownerCol: "story_id", otherCol: "album_id", otherType: "album" }],
   },
   {
     type: "milestone",
     table: "milestones",
     remoteKey: "milestones",
     columns: ["title", "description", "date", "date_precision"],
-    // milestones already have a local `category` column
-    extraColumns: ["category", "category_color", "category_icon", "end_date", "end_date_precision", "linked_stories", "position"],
+    extraColumns: ["end_date", "end_date_precision", "position"],
     images: [{ remoteField: "image_url", pathColumn: "image_path" }],
+    categorized: true,
+    links: [{ field: "linked_stories", table: "story_milestones", ownerCol: "milestone_id", otherCol: "story_id", otherType: "story" }],
   },
   {
     type: "career",
     table: "career_entries",
     remoteKey: "career",
     columns: ["organization", "title", "description", "start_date", "end_date", "is_current", "location"],
-    extraColumns: ["employment_type", ...CATEGORY_COLUMNS, "linked_albums", "linked_stories"],
+    extraColumns: ["employment_type"],
     images: [{ remoteField: "logo_url", pathColumn: "logo_path" }],
+    categorized: true,
+    links: [
+      { field: "linked_stories", table: "story_career_entries", ownerCol: "career_entry_id", otherCol: "story_id", otherType: "story" },
+      { field: "linked_albums", table: "album_career_entries", ownerCol: "career_entry_id", otherCol: "album_id", otherType: "album" },
+    ],
   },
   {
     type: "map_pin",
     table: "map_pins",
     remoteKey: "map_pins",
     columns: ["name", "description", "latitude", "longitude"],
-    extraColumns: [...CATEGORY_COLUMNS, "linked_albums", "linked_stories", "position"],
+    extraColumns: ["position"],
     images: [{ remoteField: "image_url", pathColumn: "image_path" }],
+    categorized: true,
+    links: [
+      { field: "linked_stories", table: "story_map_pins", ownerCol: "map_pin_id", otherCol: "story_id", otherType: "story" },
+      { field: "linked_albums", table: "album_map_pins", ownerCol: "map_pin_id", otherCol: "album_id", otherType: "album" },
+    ],
   },
   {
     type: "family_member",
@@ -96,7 +138,9 @@ export const ENTITIES: EntityDef[] = [
     table: "albums",
     remoteKey: "albums",
     columns: ["name", "description", "cover_image"],
-    extraColumns: [...CATEGORY_COLUMNS, "tags", "position"],
+    extraColumns: ["position"],
+    categorized: true,
+    tagged: true,
   },
   {
     type: "media",

@@ -1,24 +1,26 @@
 import { useEffect, useState } from "react";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import CategoryChip from "@/components/reader/CategoryChip";
-import { StoryChips, useLinkTargets } from "@/components/reader/LinkedChips";
+import { StoryChips } from "@/components/reader/LinkedChips";
 import { getBiography } from "@/lib/actions/biography";
 import { listMilestones } from "@/lib/actions/milestones";
 import { imageSrc } from "@/lib/image-src";
-import { formatShortDate, parseLinked } from "@/lib/reader-utils";
+import { loadMilestoneLinks, type LinkContext } from "@/lib/actions/related";
+import { formatShortDate } from "@/lib/reader-utils";
 import type { Milestone } from "@/lib/models";
 
 export default function TimelineView() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [siteTitle, setSiteTitle] = useState("");
   const [loading, setLoading] = useState(true);
-  const links = useLinkTargets();
+  const [links, setLinks] = useState<LinkContext | null>(null);
 
   useEffect(() => {
-    Promise.all([listMilestones(), getBiography()])
-      .then(([m, b]) => {
+    Promise.all([listMilestones(), getBiography(), loadMilestoneLinks()])
+      .then(([m, b, l]) => {
         setMilestones(m);
         setSiteTitle(b?.title ?? "");
+        setLinks(l);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -60,8 +62,7 @@ export default function TimelineView() {
 
                 <div className="ml-16 space-y-4">
                   {g.items.map((m) => {
-                    const img = imageSrc(m.image_path);
-                    const stories = parseLinked(m.linked_stories);
+                    const img = imageSrc(m.image_path) ?? imageSrc(links?.thumbnails.get(m.id));
                     return (
                       <div
                         key={m.id}
@@ -89,7 +90,7 @@ export default function TimelineView() {
                               {m.description}
                             </p>
                           )}
-                          <StoryChips refs={stories} ids={links.stories} />
+                          <StoryChips items={links?.stories.get(m.id)} />
                         </div>
                       </div>
                     );

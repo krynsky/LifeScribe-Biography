@@ -97,6 +97,14 @@ Adding a Rust command: implement it in `src-tauri/src/`, register it in the `gen
 ### Routing and Read/Edit mode
 The whole route tree lives in [src/routes/index.tsx](../src/routes/index.tsx). Every route renders inside `AppShell` (one sidebar). `ViewModeProvider` ([src/lib/view-mode.tsx](../src/lib/view-mode.tsx)) holds a `"read" | "edit"` mode, toggled from the sidebar and persisted to localStorage. Each section route uses `byMode(EditPage, ReadView)` to render either its editor page (`src/pages/*`) or its read-only web-style view (`src/views/*`). There are no separate `/reader` routes.
 
+### Data layer: taxonomy, links, ordering, images
+- **Migrations** live in [src/lib/migrations.ts](../src/lib/migrations.ts) (no Tauri imports, so tests apply them to in-memory SQLite). The runner splits on `;`, drops chunks starting `--` (no SQL comments inside migrations), and tolerates statements that already took effect.
+- **Categories and tags** are shared records: `categories` (name, slug, color, icon) with a `category_id` on stories, milestones, career entries, pins and albums; `tags` with `story_tags` / `album_tags`. Logic in [src/lib/data/taxonomy.ts](../src/lib/data/taxonomy.ts); read queries expose `category`, `category_color`, `category_icon` and `tags` via [src/lib/data/select.ts](../src/lib/data/select.ts).
+- **Links** between stories/albums and milestones/pins/career are seven join tables (`story_milestones`, …) managed by [src/lib/data/links.ts](../src/lib/data/links.ts). Sync fills them from the web's linked records after every entity is pulled.
+- **Ordering**: `position` columns plus `setOrder` / `moveId` in [src/lib/data/order.ts](../src/lib/data/order.ts).
+- **Images** the user adds are copied into `%LOCALAPPDATA%\com.lifescribe.app\images` ([src/lib/images.ts](../src/lib/images.ts)), named by content hash. Settings has a button to copy older, path-referenced photos in.
+- **Testing the data layer**: functions take a `SqlRunner` ([src/lib/data/sql.ts](../src/lib/data/sql.ts)); tests use `createTestDb()` from `src/lib/data/test-runner.ts`.
+
 ### Import pipeline
 1. **Photos**: `PhotoImportPage` → Rust `scan_folder`/`batch_process_photos` → rows in `media` (deduped by `import_hash`).
 2. **Archives**: `ArchiveImportPage` → Rust `extract_archive` → `archive-parsers.ts` detects the platform (Facebook / Instagram / LinkedIn) and parses JSON/CSV into `import_items`.

@@ -8,6 +8,9 @@ class FakeStore implements DataStore {
   state: Record<string, SyncState[]> = {};
   nextId = 100;
   replaceFamilyRelationships?: DataStore["replaceFamilyRelationships"];
+  setCategory?: DataStore["setCategory"];
+  setTags?: DataStore["setTags"];
+  replaceLinks?: DataStore["replaceLinks"];
   async listLocal(t: EntityType) { return this.local[t] ?? []; }
   async getLocal(t: EntityType, id: number) { return (this.local[t] ?? []).find((r) => r.local_id === id) ?? null; }
   async upsertLocal(t: EntityType, fields: Record<string, unknown>) {
@@ -271,5 +274,44 @@ describe("SyncService.refresh — web parity fields", () => {
     ];
     await new SyncService(store, adapter, "web-master").refresh();
     expect(saved).toEqual([{ from_member_id: 100, to_member_id: 101, relationship_type: "parent" }]);
+  });
+});
+
+describe("SyncService.refresh — categories, tags and links", () => {
+  it("applies category, tags and resolved links after every record exists", async () => {
+    const store = new FakeStore();
+    const cats: unknown[] = [];
+    const tags: unknown[] = [];
+    const links: unknown[] = [];
+    store.setCategory = async (t, id, cat) => { cats.push([t, id, cat]); };
+    store.setTags = async (t, id, names) => { tags.push([t, id, names]); };
+    store.replaceLinks = async (table, ownerCol, ownerId, otherIds) => { links.push([table, ownerCol, ownerId, otherIds]); };
+    const adapter = new FakeAdapter({
+      // milestone listed first: its linked story is created later in the same refresh
+      milestone: [{ remote_id: "m1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "M", category: "Travel", category_color: "#f00", category_icon: null, linked_stories: [{ remote_id: "s1" }, { remote_id: "gone" }] } }],
+      story: [{ remote_id: "s1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { title: "S", category: null, tags: ["a", "b"], related: { albums: [{ remote_id: "a1" }] } } }],
+      album: [{ remote_id: "a1", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { name: "A", category: "Fam", tags: [] } }],
+    });
+    const summary = await new SyncService(store, adapter, "web-master").refresh();
+    expect(summary.errors).toEqual([]);
+    const milestoneId = store.local.milestone[0].local_id;
+    const storyId = store.local.story[0].local_id;
+    const albumId = store.local.album[0].local_id;
+    expect(cats).toContainEqual(["milestone", milestoneId, { name: "Travel", color: "#f00", icon: null }]);
+    expect(cats).toContainEqual(["story", storyId, null]);
+    expect(tags).toContainEqual(["story", storyId, ["a", "b"]]);
+    expect(links).toContainEqual(["story_milestones", "milestone_id", milestoneId, [storyId]]); // "gone" skipped
+    expect(links).toContainEqual(["story_albums", "story_id", storyId, [albumId]]);
+  });
+
+  it("does not touch relations for a record kept as an unpublished local edit", async () => {
+    const store = new FakeStore();
+    let called = 0;
+    store.setCategory = async () => { called++; };
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "local" } }];
+    store.state.story = [{ entity_type: "story", local_id: 1, remote_id: "r1", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    const adapter = new FakeAdapter({ story: [{ remote_id: "r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "web", category: "X" } }] });
+    await new SyncService(store, adapter, "web-master").refresh();
+    expect(called).toBe(0);
   });
 });

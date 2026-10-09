@@ -2,7 +2,7 @@ import { query, execute } from "../db";
 import type { FamilyMember, FamilyRelationship } from "../models";
 
 export async function listFamilyMembers(): Promise<FamilyMember[]> {
-  return query<FamilyMember>("SELECT * FROM family_members ORDER BY surname, given_name");
+  return query<FamilyMember>("SELECT * FROM family_members ORDER BY COALESCE(position, 1000000), surname, given_name");
 }
 
 export async function getFamilyMember(id: number): Promise<FamilyMember | null> {

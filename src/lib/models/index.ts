@@ -115,6 +115,7 @@ export interface FamilyMember {
   birth_surname?: string | null;
   nickname?: string | null;
   suffix?: string | null;
+  position?: number | null;
   created_at: string;
   updated_at: string;
 }

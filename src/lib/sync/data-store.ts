@@ -1,4 +1,7 @@
 import { query, execute } from "../db";
+import { appRunner } from "../data/sql";
+import { replaceLinks, type LinkTable } from "../data/links";
+import { setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
 import { entityDef, writableColumns, type EntityType } from "./registry";
 import type { DataStore, LocalRecord, SyncState } from "./types";
 
@@ -97,6 +100,22 @@ export class SqlDataStore implements DataStore {
       `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
       [album_id, file_size, remote_url, localId]
     );
+  }
+
+  async setCategory(
+    type: EntityType,
+    localId: number,
+    cat: { name: string; color: string | null; icon: string | null } | null
+  ): Promise<void> {
+    await setCategoryByName(appRunner, entityDef(type).table as CategorizedTable, localId, cat);
+  }
+
+  async setTags(type: EntityType, localId: number, names: string[]): Promise<void> {
+    await setTags(appRunner, entityDef(type).table as TaggedTable, localId, names);
+  }
+
+  async replaceLinks(table: LinkTable, ownerCol: string, ownerId: number, otherIds: number[]): Promise<void> {
+    await replaceLinks(appRunner, table, ownerCol, ownerId, otherIds);
   }
 
   async replaceFamilyRelationships(

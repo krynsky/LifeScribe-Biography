@@ -52,6 +52,7 @@ import { VimeoEmbed } from "./extensions/vimeo-embed";
 import { OEmbedBlock } from "./extensions/oembed-block";
 
 import EditorToolbar from "./EditorToolbar";
+import { copyIntoLibrary } from "@/lib/images";
 
 interface StoryEditorProps {
   content: string | null;
@@ -161,7 +162,8 @@ export default function StoryEditor({
         filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp"] }],
       });
       if (selected && typeof selected === "string") {
-        const url = convertFileSrc(selected);
+        // Copy into the app's image library so the story keeps working if the original moves.
+        const url = convertFileSrc(await copyIntoLibrary(selected));
         editor.chain().focus().setImage({ src: url, alt: selected.split(/[\\/]/).pop() }).run();
       }
     } catch (err) {

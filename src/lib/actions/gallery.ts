@@ -1,13 +1,15 @@
 import { query, execute } from "../db";
 import type { Album, Media } from "../models";
+import { CATEGORY_SELECT, categoryJoin, tagsSelect } from "../data/select";
 
 // Albums
 
 export async function listAlbums(): Promise<(Album & { media_count: number; cover_path: string | null })[]> {
   // 1) Albums with their media counts (simple, no correlated subquery).
   const albums = await query<Album & { media_count: number }>(
-    `SELECT a.*, COUNT(m.id) as media_count
+    `SELECT a.*, ${CATEGORY_SELECT}, ${tagsSelect("album", "a")}, COUNT(m.id) as media_count
        FROM albums a
+       ${categoryJoin("a")}
        LEFT JOIN media m ON m.album_id = a.id
        GROUP BY a.id
        ORDER BY COALESCE(a.position, 1000000), a.created_at DESC`
@@ -44,7 +46,10 @@ export async function listAlbums(): Promise<(Album & { media_count: number; cove
 }
 
 export async function getAlbum(id: number): Promise<Album | null> {
-  const rows = await query<Album>("SELECT * FROM albums WHERE id = ?", [id]);
+  const rows = await query<Album>(
+    `SELECT a.*, ${CATEGORY_SELECT}, ${tagsSelect("album", "a")} FROM albums a ${categoryJoin("a")} WHERE a.id = ?`,
+    [id]
+  );
   return rows[0] ?? null;
 }
 

@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { MapPin as MapPinIcon, X } from "lucide-react";
 import MapView from "@/components/maps/MapView";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
-import { useLinkTargets } from "@/components/reader/LinkedChips";
 import { Link } from "@tanstack/react-router";
 import { listMapPins } from "@/lib/actions/map-pins";
 import { imageSrc } from "@/lib/image-src";
-import { parseLinked } from "@/lib/reader-utils";
+import { loadMapPinLinks, type LinkContext } from "@/lib/actions/related";
 import type { MapPin } from "@/lib/models";
 
 const CHIP = "inline-flex items-center rounded-full border px-1.5 py-0.5 text-xs";
@@ -17,15 +16,21 @@ export default function MapsView() {
   const [pins, setPins] = useState<MapPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<MapPin | null>(null);
-  const links = useLinkTargets();
+  const [links, setLinks] = useState<LinkContext | null>(null);
 
   useEffect(() => {
-    listMapPins().then(setPins).catch(console.error).finally(() => setLoading(false));
+    Promise.all([listMapPins(), loadMapPinLinks()])
+      .then(([p, l]) => {
+        setPins(p);
+        setLinks(l);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <ReadLoading />;
 
-  const detailImg = selected ? imageSrc(selected.image_path) : null;
+  const detailImg = selected ? imageSrc(selected.image_path) ?? imageSrc(links?.thumbnails.get(selected.id)) : null;
 
   return (
     <ReadPage title="Places" subtitle="Significant locations from a lifetime of experiences." width="full">
@@ -66,9 +71,9 @@ export default function MapsView() {
             <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>All Locations</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {pins.map((pin) => {
-                const img = imageSrc(pin.image_path);
-                const stories = parseLinked(pin.linked_stories);
-                const albums = parseLinked(pin.linked_albums);
+                const img = imageSrc(pin.image_path) ?? imageSrc(links?.thumbnails.get(pin.id));
+                const stories = links?.stories.get(pin.id) ?? [];
+                const albums = links?.albums.get(pin.id) ?? [];
                 return (
                   <div
                     key={pin.id}
@@ -101,25 +106,29 @@ export default function MapsView() {
                       )}
                       {(stories.length > 0 || albums.length > 0) && (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          {stories.map((s, i) => {
-                            const id = s.remote_id ? links.stories.get(s.remote_id) : undefined;
-                            return id != null ? (
-                              <Link
-                                key={s.remote_id ?? i}
-                                to="/stories/$storyId"
-                                params={{ storyId: String(id) }}
-                                onClick={(e) => e.stopPropagation()}
-                                className={CHIP}
-                                style={STORY_STYLE}
-                              >
-                                📖 {s.title}
-                              </Link>
-                            ) : (
-                              <span key={s.remote_id ?? i} className={CHIP} style={STORY_STYLE}>📖 {s.title}</span>
-                            );
-                          })}
-                          {albums.map((a, i) => (
-                            <span key={a.remote_id ?? i} className={CHIP} style={ALBUM_STYLE}>🖼️ {a.title}</span>
+                          {stories.map((st) => (
+                            <Link
+                              key={st.id}
+                              to="/stories/$storyId"
+                              params={{ storyId: String(st.id) }}
+                              onClick={(e) => e.stopPropagation()}
+                              className={CHIP}
+                              style={STORY_STYLE}
+                            >
+                              📖 {st.title}
+                            </Link>
+                          ))}
+                          {albums.map((a) => (
+                            <Link
+                              key={a.id}
+                              to="/gallery/albums/$albumId"
+                              params={{ albumId: String(a.id) }}
+                              onClick={(e) => e.stopPropagation()}
+                              className={CHIP}
+                              style={ALBUM_STYLE}
+                            >
+                              🖼️ {a.title}
+                            </Link>
                           ))}
                         </div>
                       )}

@@ -36,6 +36,11 @@ function matchableUrl(fields: Record<string, unknown>): string | null {
   return (fields.url as string | null) ?? null;
 }
 
+/** Read a dotted path ("related.albums") from pulled fields. */
+function getPath(obj: Record<string, unknown>, path: string): unknown {
+  return path.split(".").reduce<unknown>((cur, key) => (cur && typeof cur === "object" ? (cur as Record<string, unknown>)[key] : undefined), obj);
+}
+
 export class SyncService {
   constructor(
     private store: DataStore,
@@ -46,6 +51,7 @@ export class SyncService {
   async refresh(onProgress?: (msg: string) => void): Promise<RefreshSummary> {
     const summary: RefreshSummary = { created: 0, updated: 0, deleted: 0, conflicts: [], errors: [] };
     if (this.mode === "standalone") return summary;
+    this.pendingRelations = [];
 
     onProgress?.("Fetching web content…");
     const remoteByType = await this.adapter.pullAll();
@@ -82,6 +88,17 @@ export class SyncService {
       }
     }
 
+    // Categories, tags and links are applied once every record exists locally, so remote ids
+    // can be resolved to local ids regardless of the order entities were pulled in.
+    for (const p of this.pendingRelations) {
+      try {
+        await this.applyRelations(p.type, p.localId, p.fields);
+      } catch (e) {
+        summary.errors.push(`${p.type}:${p.localId} relations: ${(e as Error).message}`);
+      }
+    }
+    this.pendingRelations = [];
+
     if (this.mode === "web-master") {
       try {
         await this.syncFamilyRelationships();
@@ -90,6 +107,35 @@ export class SyncService {
       }
     }
     return summary;
+  }
+
+  private pendingRelations: Array<{ type: EntityType; localId: number; fields: Record<string, unknown> }> = [];
+
+  /** Map a pulled record's category, tags and linked-record refs onto the local relational tables. */
+  private async applyRelations(type: EntityType, localId: number, fields: Record<string, unknown>): Promise<void> {
+    const def = entityDef(type);
+    if (def.categorized && "category" in fields && this.store.setCategory) {
+      const name = fields.category as string | null;
+      await this.store.setCategory(
+        type,
+        localId,
+        name ? { name, color: (fields.category_color as string | null) ?? null, icon: (fields.category_icon as string | null) ?? null } : null
+      );
+    }
+    if (def.tagged && Array.isArray(fields.tags) && this.store.setTags) {
+      await this.store.setTags(type, localId, (fields.tags as unknown[]).filter((t): t is string => typeof t === "string"));
+    }
+    for (const spec of def.links ?? []) {
+      const refs = getPath(fields, spec.field);
+      if (!Array.isArray(refs) || !this.store.replaceLinks) continue;
+      const otherIds: number[] = [];
+      for (const ref of refs as Array<{ remote_id?: string }>) {
+        if (!ref?.remote_id) continue;
+        const st = await this.store.getSyncStateByRemote(spec.otherType, ref.remote_id);
+        if (st) otherIds.push(st.local_id);
+      }
+      await this.store.replaceLinks(spec.table, spec.ownerCol, localId, otherIds);
+    }
   }
 
   /** Rebuild local family relationships from the web's, mapped onto local member ids. */
@@ -232,6 +278,7 @@ export class SyncService {
           const fields = await this.withDownloadedImages(def, remote, summary, onProgress);
           const localId = await this.store.upsertLocal(type, fields);
           await this.link(type, localId, remote);
+          this.pendingRelations.push({ type, localId, fields: remote.fields });
         }
         summary.created++;
         break;
@@ -254,6 +301,7 @@ export class SyncService {
           const fields = await this.withDownloadedImages(def, remote, summary, onProgress);
           await this.store.updateLocalById(type, existing.local_id, fields);
           await this.link(type, existing.local_id, remote);
+          this.pendingRelations.push({ type, localId: existing.local_id, fields: remote.fields });
           summary.updated++;
         }
         break;

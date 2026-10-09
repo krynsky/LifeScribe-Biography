@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "@tanstack/react-router";
 import StoryEditor from "@/components/editor/StoryEditor";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
-import { AlbumChips, useLinkTargets } from "@/components/reader/LinkedChips";
+import { AlbumChips } from "@/components/reader/LinkedChips";
 import { TagList } from "@/components/reader/CategoryChip";
 import { getStory } from "@/lib/actions/stories";
 import { getBiography } from "@/lib/actions/biography";
 import { imageSrc } from "@/lib/image-src";
-import { formatDisplayDate, parseRelated, parseTags } from "@/lib/reader-utils";
+import { getRelationsForStory, type StoryRelations } from "@/lib/actions/related";
+import { formatDisplayDate, parseTags } from "@/lib/reader-utils";
 import type { Story } from "@/lib/models";
 
 export default function StoryView() {
@@ -15,14 +16,15 @@ export default function StoryView() {
   const [story, setStory] = useState<Story | null>(null);
   const [siteTitle, setSiteTitle] = useState("");
   const [loading, setLoading] = useState(true);
-  const links = useLinkTargets();
+  const [related, setRelated] = useState<StoryRelations | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getStory(Number(storyId)), getBiography()])
-      .then(([s, b]) => {
+    Promise.all([getStory(Number(storyId)), getBiography(), getRelationsForStory(Number(storyId))])
+      .then(([s, b, r]) => {
         setStory(s);
         setSiteTitle(b?.title ?? "");
+        setRelated(r);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -39,9 +41,8 @@ export default function StoryView() {
 
   const hero = imageSrc(story.featured_image_path);
   const tags = parseTags(story.tags);
-  const related = parseRelated(story.related);
   const hasRelated =
-    related.milestones.length > 0 || related.albums.length > 0 || related.map_pins.length > 0 || related.career.length > 0;
+    !!related && (related.milestones.length > 0 || related.albums.length > 0 || related.mapPins.length > 0 || related.career.length > 0);
   const date = formatDisplayDate(story.event_date, story.event_date_precision);
   const heading = { fontFamily: "var(--font-heading)", color: "var(--color-text)" } as const;
   const sectionLabel = "mb-2 text-xs font-medium";
@@ -88,7 +89,7 @@ export default function StoryView() {
         </div>
       )}
 
-      {hasRelated && (
+      {hasRelated && related && (
         <div className="mt-10 rounded-xl border p-6" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>
             Related Entries
@@ -98,8 +99,8 @@ export default function StoryView() {
               <div>
                 <h3 className={sectionLabel} style={{ color: "var(--color-text-muted)" }}>📅 Timeline</h3>
                 <ul className="space-y-1">
-                  {related.milestones.map((m, i) => (
-                    <li key={i} className="text-sm" style={{ color: "var(--color-text)" }}>
+                  {related.milestones.map((m) => (
+                    <li key={m.id} className="text-sm" style={{ color: "var(--color-text)" }}>
                       {m.title} <span style={{ color: "var(--color-text-muted)" }}>· {m.year}</span>
                     </li>
                   ))}
@@ -109,15 +110,15 @@ export default function StoryView() {
             {related.albums.length > 0 && (
               <div>
                 <h3 className={sectionLabel} style={{ color: "var(--color-text-muted)" }}>🖼️ Gallery</h3>
-                <AlbumChips refs={related.albums} ids={links.albums} />
+                <AlbumChips items={related.albums} />
               </div>
             )}
-            {related.map_pins.length > 0 && (
+            {related.mapPins.length > 0 && (
               <div>
                 <h3 className={sectionLabel} style={{ color: "var(--color-text-muted)" }}>📍 Places</h3>
                 <ul className="space-y-1">
-                  {related.map_pins.map((p, i) => (
-                    <li key={i} className="text-sm" style={{ color: "var(--color-text)" }}>{p.name}</li>
+                  {related.mapPins.map((p) => (
+                    <li key={p.id} className="text-sm" style={{ color: "var(--color-text)" }}>{p.name}</li>
                   ))}
                 </ul>
               </div>
@@ -126,9 +127,9 @@ export default function StoryView() {
               <div>
                 <h3 className={sectionLabel} style={{ color: "var(--color-text-muted)" }}>💼 Career</h3>
                 <ul className="space-y-1">
-                  {related.career.map((c, i) => (
-                    <li key={i} className="text-sm" style={{ color: "var(--color-text)" }}>
-                      {c.title} <span style={{ color: "var(--color-text-muted)" }}>@ {c.company}</span>
+                  {related.career.map((c) => (
+                    <li key={c.id} className="text-sm" style={{ color: "var(--color-text)" }}>
+                      {c.title ?? "Role"} <span style={{ color: "var(--color-text-muted)" }}>@ {c.company}</span>
                     </li>
                   ))}
                 </ul>

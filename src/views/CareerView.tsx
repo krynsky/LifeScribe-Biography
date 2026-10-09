@@ -1,24 +1,26 @@
 import { useEffect, useState } from "react";
 import ReadPage, { ReadLoading } from "@/components/reader/ReadPage";
 import CategoryChip from "@/components/reader/CategoryChip";
-import { AlbumChips, StoryChips, useLinkTargets } from "@/components/reader/LinkedChips";
+import { AlbumChips, StoryChips } from "@/components/reader/LinkedChips";
 import { getBiography } from "@/lib/actions/biography";
 import { listCareerEntries } from "@/lib/actions/career";
 import { imageSrc } from "@/lib/image-src";
-import { computeDuration, formatMonthYear, parseLinked } from "@/lib/reader-utils";
+import { loadCareerLinks, type LinkContext } from "@/lib/actions/related";
+import { computeDuration, formatMonthYear } from "@/lib/reader-utils";
 import type { CareerEntry } from "@/lib/models";
 
 export default function CareerView() {
   const [entries, setEntries] = useState<CareerEntry[]>([]);
   const [siteTitle, setSiteTitle] = useState("");
   const [loading, setLoading] = useState(true);
-  const links = useLinkTargets();
+  const [links, setLinks] = useState<LinkContext | null>(null);
 
   useEffect(() => {
-    Promise.all([listCareerEntries(), getBiography()])
-      .then(([e, b]) => {
+    Promise.all([listCareerEntries(), getBiography(), loadCareerLinks()])
+      .then(([e, b, l]) => {
         setEntries(e);
         setSiteTitle(b?.title ?? "");
+        setLinks(l);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -38,7 +40,7 @@ export default function CareerView() {
           <div className="absolute bottom-2 left-5 top-2 w-px" style={{ background: "var(--color-border)" }} aria-hidden />
           <div className="space-y-8">
             {entries.map((entry) => {
-              const logo = imageSrc(entry.logo_path);
+              const logo = imageSrc(entry.logo_path) ?? imageSrc(links?.thumbnails.get(entry.id));
               const range = `${formatMonthYear(entry.start_date)} – ${
                 entry.is_current ? "Present" : entry.end_date ? formatMonthYear(entry.end_date) : "?"
               }`;
@@ -107,8 +109,8 @@ export default function CareerView() {
                         </p>
                       )}
 
-                      <AlbumChips refs={parseLinked(entry.linked_albums)} ids={links.albums} />
-                      <StoryChips refs={parseLinked(entry.linked_stories)} ids={links.stories} />
+                      <AlbumChips items={links?.albums.get(entry.id)} />
+                      <StoryChips items={links?.stories.get(entry.id)} />
                     </div>
                   </div>
                 </div>
