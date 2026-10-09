@@ -9,6 +9,8 @@ import {
 } from "@/lib/sync";
 import { testConnection, type RemoteProfile } from "@/lib/sync/web-profile";
 import { copyReferencedPhotosIntoLibrary } from "@/lib/actions/library";
+import { createBackup } from "@/lib/backup";
+import PublishReviewModal from "@/components/sync/PublishReviewModal";
 
 export default function SettingsPage() {
   // Photo library migration
@@ -44,6 +46,7 @@ export default function SettingsPage() {
   const [mode, setMode] = useState<SyncMode>(getSyncMode());
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [unpublished, setUnpublished] = useState<Array<{ entity_type: string; local_id: number }>>([]);
+  const [showPublish, setShowPublish] = useState(false);
 
   useEffect(() => {
     setApiKey(getApiKey());
@@ -99,6 +102,8 @@ export default function SettingsPage() {
     setSyncStatus("");
     try {
       const svc = makeSyncService();
+      setSyncStatus("Backing up your data…");
+      await createBackup("before-refresh").catch((e) => console.error("Backup before refresh failed:", e));
       const summary = await svc.refresh((msg) => setSyncStatus(msg));
       setConflicts(summary.conflicts);
       setUnpublished(await svc.listUnpublished());
@@ -116,6 +121,8 @@ export default function SettingsPage() {
     setSyncStatus("");
     try {
       const svc = makeSyncService();
+      setSyncStatus("Backing up your data…");
+      await createBackup("before-reset");
       const summary = await svc.reset((msg) => setSyncStatus(msg));
       setSyncStatus(`Reset complete — ${summary.created + summary.updated} records refreshed from web`);
       setUnpublished(await svc.listUnpublished());
@@ -126,25 +133,19 @@ export default function SettingsPage() {
     }
   }
 
-  async function handlePublishAll() {
-    setSyncing(true);
-    setSyncStatus("");
+  async function refreshUnpublished() {
     try {
-      const svc = makeSyncService();
-      const items = await svc.listUnpublished();
-      const res = await svc.publish(items, (msg) => setSyncStatus(msg));
-      setUnpublished(await svc.listUnpublished());
-      setSyncStatus(`Published ${res.published} item${res.published === 1 ? "" : "s"}${res.errors.length ? ` · ${res.errors.length} failed` : ""}`);
-    } catch (err) {
-      setSyncStatus("Publish failed: " + String(err));
-    } finally {
-      setSyncing(false);
+      setUnpublished(await makeSyncService().listUnpublished());
+    } catch {
+      /* the count is informational */
     }
   }
 
   return (
     <div className="p-8 max-w-2xl">
       <PageHeader title="Settings" />
+
+      <PublishReviewModal open={showPublish} onClose={() => setShowPublish(false)} onFinished={() => void refreshUnpublished()} />
 
       <div className="space-y-6">
         {/* Claude API Key */}
@@ -248,11 +249,11 @@ export default function SettingsPage() {
                       {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                       {syncing ? "Working…" : "Refresh from web"}
                     </button>
-                    <button onClick={handlePublishAll} disabled={syncing || unpublished.length === 0}
+                    <button onClick={() => setShowPublish(true)} disabled={syncing}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-50"
                       style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
-                      title="Push your unpublished local edits to the web">
-                      Publish{unpublished.length ? ` (${unpublished.length})` : ""}
+                      title="Review and send your new and changed items to your website">
+                      Review &amp; publish{unpublished.length ? ` (${unpublished.length})` : ""}
                     </button>
                     <button onClick={handleResetRefresh} disabled={syncing}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border disabled:opacity-60"

@@ -43,6 +43,17 @@ export interface RemoteRelationship {
   type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
 }
 
+/** A local record with changes the web does not have yet. */
+export interface UnpublishedItem {
+  entity_type: EntityType;
+  local_id: number;
+  /** "new": never published. "changed": published before and edited since. */
+  kind: "new" | "changed";
+  label: string;
+  /** Something the user should know before publishing this item. */
+  warning?: string;
+}
+
 export interface DataStore {
   listLocal(type: EntityType): Promise<LocalRecord[]>;
   getLocal(type: EntityType, localId: number): Promise<LocalRecord | null>;
@@ -71,6 +82,11 @@ export interface DataStore {
     remote_url: string | null
   ): Promise<void>;
 
+  /**
+   * The complete payload for publishing one local record: syncable and push-enabled columns plus
+   * its category (name/color/icon) and tag names. Falls back to getLocal(...).fields when absent.
+   */
+  getPushFields?(type: EntityType, localId: number): Promise<Record<string, unknown> | null>;
   /** Assign (or clear, with null) the category of a local row, creating the category when new. */
   setCategory?(type: EntityType, localId: number, cat: { name: string; color: string | null; icon: string | null } | null): Promise<void>;
   /** Replace a local row's tags with exactly these names. */

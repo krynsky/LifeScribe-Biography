@@ -5,7 +5,7 @@ import { getSyncMode } from "./config";
 
 export { SyncService } from "./sync-service";
 export * from "./config";
-export type { SyncMode, SyncState } from "./types";
+export type { SyncMode, SyncState, UnpublishedItem } from "./types";
 export type { RefreshSummary, ConflictItem } from "./sync-service";
 
 /** Build a SyncService wired to the real SQLite store and REST adapter. */

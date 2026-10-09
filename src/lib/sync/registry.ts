@@ -27,6 +27,8 @@ export interface EntityDef {
    * pushed, and ignored by dirty detection (which uses updated_at).
    */
   extraColumns?: string[];
+  /** Subset of extraColumns the app also sends on publish (the web accepts and stores them). */
+  pushColumns?: string[];
   /** Remote image URLs downloaded to local files during refresh. */
   images?: ImageDef[];
   /** True when the web record can carry a category (name/color/icon) that maps to a local category. */
@@ -74,6 +76,7 @@ export const ENTITIES: EntityDef[] = [
     singleton: true,
     columns: ["title", "tagline", "bio"],
     extraColumns: ["subject_first_name", "subject_middle_name", "subject_last_name", "subject_maiden_name", "subject_suffix"],
+    pushColumns: ["subject_first_name", "subject_middle_name", "subject_last_name", "subject_maiden_name", "subject_suffix"],
     images: [
       { remoteField: "banner_image_url", pathColumn: "cover_photo_path" },
       { remoteField: "profile_image_url", pathColumn: "avatar_photo_path" },
@@ -96,6 +99,7 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "milestones",
     columns: ["title", "description", "date", "date_precision"],
     extraColumns: ["end_date", "end_date_precision", "position"],
+    pushColumns: ["end_date", "end_date_precision"],
     images: [{ remoteField: "image_url", pathColumn: "image_path" }],
     categorized: true,
     links: [{ field: "linked_stories", table: "story_milestones", ownerCol: "milestone_id", otherCol: "story_id", otherType: "story" }],
@@ -106,6 +110,7 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "career",
     columns: ["organization", "title", "description", "start_date", "end_date", "is_current", "location"],
     extraColumns: ["employment_type"],
+    pushColumns: ["employment_type"],
     images: [{ remoteField: "logo_url", pathColumn: "logo_path" }],
     categorized: true,
     links: [
@@ -132,6 +137,7 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "family_members",
     columns: ["given_name", "surname", "birth_date", "death_date", "bio"],
     extraColumns: ["gender", "birth_surname", "nickname", "suffix"],
+    pushColumns: ["gender", "birth_surname", "nickname", "suffix"],
     images: [{ remoteField: "photo_url", pathColumn: "photo_path" }],
   },
   {
@@ -165,4 +171,30 @@ export function writableColumns(def: EntityDef): string[] {
     ...(def.extraColumns ?? []),
     ...(def.images ?? []).map((i) => i.pathColumn),
   ];
+}
+
+/** Every column sent when publishing an entity: syncable columns plus the push-enabled extras. */
+export function pushableColumns(def: EntityDef): string[] {
+  return [...def.columns, ...(def.pushColumns ?? [])];
+}
+
+/** Human label for a record in lists ("Trip to Argentina", "Dev @ Org", "Jane Doe"). */
+export function entityLabel(type: EntityType, fields: Record<string, unknown>): string {
+  const str = (k: string) => (typeof fields[k] === "string" ? (fields[k] as string).trim() : "");
+  switch (type) {
+    case "story":
+    case "milestone":
+      return str("title") || "Untitled";
+    case "career":
+      return [str("title"), str("organization")].filter(Boolean).join(" @ ") || "Career entry";
+    case "map_pin":
+    case "album":
+      return str("name") || "Untitled";
+    case "family_member":
+      return [str("given_name"), str("surname")].filter(Boolean).join(" ") || "Family member";
+    case "biography":
+      return str("title") || "Profile";
+    default:
+      return str("filename") || "Item";
+  }
 }

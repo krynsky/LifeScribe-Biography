@@ -9,6 +9,7 @@ class FakeStore implements DataStore {
   nextId = 100;
   mergeFamilyRelationships?: DataStore["mergeFamilyRelationships"];
   setCategory?: DataStore["setCategory"];
+  getPushFields?: DataStore["getPushFields"];
   setTags?: DataStore["setTags"];
   replaceLinks?: DataStore["replaceLinks"];
   async listLocal(t: EntityType) { return this.local[t] ?? []; }
@@ -143,7 +144,35 @@ describe("SyncService.listUnpublished", () => {
     ];
     const svc = new SyncService(store, new FakeAdapter(), "web-master");
     const list = await svc.listUnpublished();
-    expect(list).toEqual([{ entity_type: "story", local_id: 1 }]);
+    expect(list).toEqual([{ entity_type: "story", local_id: 1, kind: "changed", label: "dirty" }]);
+  });
+
+  it("also lists records that were never published, labelled for review", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "Brand new" } }];
+    store.local.career = [{ local_id: 1, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "Dev", organization: "Org" } }];
+    store.local.family_member = [{ local_id: 1, updated_at: "2026-01-01T00:00:00.000Z", fields: { given_name: "Jane", surname: "Doe" } }];
+    const list = await new SyncService(store, new FakeAdapter(), "web-master").listUnpublished();
+    expect(list).toEqual([
+      { entity_type: "story", local_id: 1, kind: "new", label: "Brand new" },
+      { entity_type: "career", local_id: 1, kind: "new", label: "Dev @ Org" },
+      { entity_type: "family_member", local_id: 1, kind: "new", label: "Jane Doe" },
+    ]);
+  });
+
+  it("never offers to create the profile (it is only ever updated)", async () => {
+    const store = new FakeStore();
+    store.local.biography = [{ local_id: 1, updated_at: "2026-01-05T00:00:00.000Z", fields: { title: "My Life Story" } }];
+    const svc = new SyncService(store, new FakeAdapter(), "web-master");
+    expect(await svc.listUnpublished()).toEqual([]); // never synced: no baseline, no create
+    store.state.biography = [{ entity_type: "biography", local_id: 1, remote_id: "site", last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" }];
+    expect(await svc.listUnpublished()).toEqual([{ entity_type: "biography", local_id: 1, kind: "changed", label: "My Life Story" }]);
+  });
+
+  it("lists nothing in standalone mode", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "x" } }];
+    expect(await new SyncService(store, new FakeAdapter(), "standalone").listUnpublished()).toEqual([]);
   });
 });
 
@@ -313,5 +342,75 @@ describe("SyncService.refresh — categories, tags and links", () => {
     const adapter = new FakeAdapter({ story: [{ remote_id: "r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "web", category: "X" } }] });
     await new SyncService(store, adapter, "web-master").refresh();
     expect(called).toBe(0);
+  });
+});
+
+describe("SyncService.publish — new records and full payload", () => {
+  it("creates a new record on the web, links it, and sends the store's full payload", async () => {
+    const store = new FakeStore();
+    store.local.milestone = [{ local_id: 7, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "Core only" } }];
+    store.getPushFields = async () => ({ title: "Core only", end_date: "2020-05-01", category: "Travel", category_color: "#0EA5E9", category_icon: null });
+    const adapter = new FakeAdapter();
+    let sent: Array<{ local_id: number; remote_id: string | null; fields: Record<string, unknown> }> = [];
+    adapter.push = async (_t, records) => {
+      sent = records;
+      return { remoteIdMap: { 7: "new-remote" }, remoteUpdatedAt: { 7: "2026-02-01T00:00:00.000Z" }, conflicts: [] };
+    };
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "milestone", local_id: 7 }]);
+    expect(res).toEqual({ published: 1, errors: [] });
+    expect(sent[0].remote_id).toBeNull();
+    expect(sent[0].fields).toMatchObject({ end_date: "2020-05-01", category: "Travel" });
+    const st = await store.getSyncState("milestone", 7);
+    expect(st).toMatchObject({ remote_id: "new-remote", last_synced_remote_at: "2026-02-01T00:00:00.000Z", last_synced_at: "2026-01-03T00:00:00.000Z" });
+    // once published it is no longer "new"
+    expect(await new SyncService(store, adapter, "web-master").listUnpublished()).toEqual([]);
+  });
+
+  it("a new record the web rejects stays unpublished and is reported", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "T" } }];
+    const adapter = new FakeAdapter();
+    adapter.push = async () => ({ remoteIdMap: {}, remoteUpdatedAt: {}, conflicts: ["stories:1:invalid_content"] });
+    const svc = new SyncService(store, adapter, "web-master");
+    const res = await svc.publish([{ entity_type: "story", local_id: 1 }]);
+    expect(res.published).toBe(0);
+    expect(res.errors).toHaveLength(1);
+    expect(await store.getSyncState("story", 1)).toBeNull();
+    expect((await svc.listUnpublished()).map((i) => i.kind)).toEqual(["new"]);
+  });
+});
+
+describe("SyncService.listUnpublished — local photo warning", () => {
+  it("warns about story bodies that contain photos stored on this computer", async () => {
+    const store = new FakeStore();
+    const withLocal = JSON.stringify({ type: "doc", content: [{ type: "image", attrs: { src: "http://asset.localhost/C%3A/a.jpg" } }] });
+    store.local.story = [
+      { local_id: 1, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "Has local photo", content: withLocal } },
+      { local_id: 2, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "Plain", content: "{}" } },
+    ];
+    const list = await new SyncService(store, new FakeAdapter(), "web-master").listUnpublished();
+    expect(list.find((i) => i.local_id === 1)?.warning).toMatch(/photos stored on this computer/);
+    expect(list.find((i) => i.local_id === 2)?.warning).toBeUndefined();
+  });
+});
+
+describe("SyncService.reset", () => {
+  it("leaves records with unpublished local edits untouched", async () => {
+    const store = new FakeStore();
+    store.local.story = [
+      { local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "my edit" } },
+      { local_id: 2, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "clean" } },
+    ];
+    const synced = (id: number, rid: string): SyncState => ({ entity_type: "story", local_id: id, remote_id: rid, last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z" });
+    store.state.story = [synced(1, "r1"), synced(2, "r2")];
+    const adapter = new FakeAdapter({
+      story: [
+        { remote_id: "r1", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "web 1" } },
+        { remote_id: "r2", remote_updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "web 2" } },
+      ],
+    });
+    await new SyncService(store, adapter, "web-master").reset();
+    expect(store.local.story.find((r) => r.local_id === 1)!.fields.title).toBe("my edit"); // kept
+    expect(store.local.story.find((r) => r.local_id === 2)!.fields.title).toBe("web 2"); // re-pulled
   });
 });

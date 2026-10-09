@@ -2,8 +2,8 @@ import { query, execute } from "../db";
 import { appRunner } from "../data/sql";
 import { replaceLinks, type LinkTable } from "../data/links";
 import { mergeRelationships } from "../data/family";
-import { setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
-import { entityDef, writableColumns, type EntityType } from "./registry";
+import { getTagNames, setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
+import { entityDef, pushableColumns, writableColumns, type EntityType } from "./registry";
 import type { DataStore, LocalRecord, SyncState } from "./types";
 
 function toLocalRecord(def: ReturnType<typeof entityDef>, row: Record<string, unknown>): LocalRecord {
@@ -101,6 +101,26 @@ export class SqlDataStore implements DataStore {
       `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
       [album_id, file_size, remote_url, localId]
     );
+  }
+
+  async getPushFields(type: EntityType, localId: number): Promise<Record<string, unknown> | null> {
+    const def = entityDef(type);
+    const rows = await query<Record<string, unknown>>(`SELECT * FROM ${def.table} WHERE id = ?`, [localId]);
+    const row = rows[0];
+    if (!row) return null;
+    const fields: Record<string, unknown> = {};
+    for (const c of pushableColumns(def)) fields[c] = row[c] ?? null;
+    if (def.categorized) {
+      const cat = await query<{ name: string; color: string | null; icon: string | null }>(
+        `SELECT c.name, c.color, c.icon FROM categories c JOIN ${def.table} t ON t.category_id = c.id WHERE t.id = ?`,
+        [localId]
+      );
+      fields.category = cat[0]?.name ?? null;
+      fields.category_color = cat[0]?.color ?? null;
+      fields.category_icon = cat[0]?.icon ?? null;
+    }
+    if (def.tagged) fields.tags = await getTagNames(appRunner, def.table as TaggedTable, localId);
+    return fields;
   }
 
   async setCategory(

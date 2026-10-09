@@ -1,6 +1,7 @@
-import { ENTITIES, entityDef, type EntityType } from "./registry";
+import { ENTITIES, entityDef, entityLabel, type EntityType } from "./registry";
 import { decide } from "./reconcile";
-import type { DataStore, RemoteRecord, SyncMode, SyncState, WebAdapter } from "./types";
+import { LOCAL_IMAGES_WARNING, hasLocalImages } from "./local-images";
+import type { DataStore, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
 
 export interface ConflictItem {
   entity_type: EntityType;
@@ -205,11 +206,13 @@ export class SyncService {
         const local = await this.store.getLocal(type, localId);
         const st = await this.store.getSyncState(type, localId);
         if (!local) continue;
+        // Full payload (extra columns, category, tags) when the store can build it.
+        const fields = (await this.store.getPushFields?.(type, localId)) ?? local.fields;
         records.push({
           local_id: localId,
           remote_id: st?.remote_id ?? null,
           last_synced_remote_at: st?.last_synced_remote_at ?? null,
-          fields: local.fields,
+          fields,
         });
       }
       if (records.length === 0) continue;
@@ -320,16 +323,26 @@ export class SyncService {
     return st?.local_id ?? null;
   }
 
-  /** Records with local edits not yet published (dirty + linked). */
-  async listUnpublished(): Promise<Array<{ entity_type: EntityType; local_id: number }>> {
-    const out: Array<{ entity_type: EntityType; local_id: number }> = [];
+  /**
+   * Local records the web does not have yet: **new** ones that were never published and **changed**
+   * ones edited since they were last synced. The profile is only ever "changed" (never created), so
+   * connecting a fresh app cannot overwrite the website's title with a default.
+   */
+  async listUnpublished(): Promise<UnpublishedItem[]> {
+    const out: UnpublishedItem[] = [];
+    if (this.mode === "standalone") return out;
     for (const def of ENTITIES) {
-      const states = await this.store.listSyncState(def.type);
-      for (const st of states) {
-        if (!st.remote_id || !st.last_synced_at) continue;
-        const local = await this.store.getLocal(def.type, st.local_id);
-        if (local && local.updated_at > st.last_synced_at) {
-          out.push({ entity_type: def.type, local_id: st.local_id });
+      if (def.binary) continue;
+      const states = new Map((await this.store.listSyncState(def.type)).map((st) => [st.local_id, st]));
+      for (const local of await this.store.listLocal(def.type)) {
+        const st = states.get(local.local_id);
+        const label = entityLabel(def.type, local.fields);
+        const warning = def.type === "story" && hasLocalImages(local.fields.content) ? LOCAL_IMAGES_WARNING : undefined;
+        const base = { entity_type: def.type, local_id: local.local_id, label, ...(warning ? { warning } : {}) };
+        if (!st || !st.remote_id) {
+          if (!def.singleton) out.push({ ...base, kind: "new" });
+        } else if (st.last_synced_at && local.updated_at > st.last_synced_at) {
+          out.push({ ...base, kind: "changed" });
         }
       }
     }
@@ -339,11 +352,16 @@ export class SyncService {
   /**
    * Recovery: force every linked local record to be re-pulled fresh by clearing
    * last_synced_* (so decide() sees web as changed and local as clean), then refresh().
+   * Records with unpublished local edits are skipped.
    */
   async reset(onProgress?: (msg: string) => void): Promise<RefreshSummary> {
     for (const def of ENTITIES) {
       const states = await this.store.listSyncState(def.type);
       for (const st of states) {
+        // Keep records with unpublished local edits as they are, so a reset can never discard your work.
+        const local = await this.store.getLocal(def.type, st.local_id);
+        const dirty = !!local && !!st.last_synced_at && local.updated_at > st.last_synced_at;
+        if (dirty) continue;
         await this.store.putSyncState({ ...st, last_synced_remote_at: null, last_synced_at: null });
       }
     }
