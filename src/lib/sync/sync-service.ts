@@ -138,10 +138,10 @@ export class SyncService {
     }
   }
 
-  /** Rebuild local family relationships from the web's, mapped onto local member ids. */
+  /** Add the web's family relationships (mapped onto local member ids) that are missing locally. Never deletes. */
   private async syncFamilyRelationships(): Promise<void> {
     const remote = this.adapter.getFamilyRelationships?.();
-    if (!remote || !this.store.replaceFamilyRelationships) return;
+    if (!remote || !this.store.mergeFamilyRelationships) return;
     const idByRemote = new Map<string, number>();
     for (const st of await this.store.listSyncState("family_member")) {
       if (st.remote_id) idByRemote.set(st.remote_id, st.local_id);
@@ -154,7 +154,7 @@ export class SyncService {
         rows.push({ from_member_id: from, to_member_id: to, relationship_type: r.type });
       }
     }
-    await this.store.replaceFamilyRelationships(rows);
+    await this.store.mergeFamilyRelationships(rows);
   }
 
   /**

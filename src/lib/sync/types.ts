@@ -77,8 +77,8 @@ export interface DataStore {
   setTags?(type: EntityType, localId: number, names: string[]): Promise<void>;
   /** Replace one owner's rows in a link table. */
   replaceLinks?(table: LinkTable, ownerCol: string, ownerId: number, otherIds: number[]): Promise<void>;
-  /** Replace all family relationships with the given local-id pairs (web is the source of truth). */
-  replaceFamilyRelationships?(
+  /** Add family relationships (local ids) that are missing; never removes ones created in the app. */
+  mergeFamilyRelationships?(
     rels: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>
   ): Promise<void>;
 

@@ -1,6 +1,7 @@
 import { query, execute } from "../db";
 import { appRunner } from "../data/sql";
 import { replaceLinks, type LinkTable } from "../data/links";
+import { mergeRelationships } from "../data/family";
 import { setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
 import { entityDef, writableColumns, type EntityType } from "./registry";
 import type { DataStore, LocalRecord, SyncState } from "./types";
@@ -118,16 +119,10 @@ export class SqlDataStore implements DataStore {
     await replaceLinks(appRunner, table, ownerCol, ownerId, otherIds);
   }
 
-  async replaceFamilyRelationships(
+  async mergeFamilyRelationships(
     rels: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>
   ): Promise<void> {
-    await execute(`DELETE FROM family_relationships`);
-    for (const r of rels) {
-      await execute(
-        `INSERT OR IGNORE INTO family_relationships (from_member_id, to_member_id, relationship_type) VALUES (?,?,?)`,
-        [r.from_member_id, r.to_member_id, r.relationship_type]
-      );
-    }
+    await mergeRelationships(appRunner, rels);
   }
 
   async listSyncState(type: EntityType): Promise<SyncState[]> {

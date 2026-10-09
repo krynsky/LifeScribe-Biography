@@ -1,5 +1,24 @@
 import { query, execute } from "../db";
+import { appRunner } from "../data/sql";
+import * as family from "../data/family";
 import type { FamilyMember, FamilyRelationship } from "../models";
+
+export type { RelationshipType } from "../data/family";
+export { RELATIONSHIP_TYPES, RELATIONSHIP_PHRASES, describeRelationship } from "../data/family";
+
+export interface FamilyMemberInput {
+  given_name: string;
+  surname?: string | null;
+  birth_surname?: string | null;
+  nickname?: string | null;
+  suffix?: string | null;
+  gender?: "male" | "female" | "other" | null;
+  birth_date?: string | null;
+  death_date?: string | null;
+  birth_place?: string | null;
+  bio?: string | null;
+  photo_path?: string | null;
+}
 
 export async function listFamilyMembers(): Promise<FamilyMember[]> {
   return query<FamilyMember>("SELECT * FROM family_members ORDER BY COALESCE(position, 1000000), surname, given_name");
@@ -10,80 +29,47 @@ export async function getFamilyMember(id: number): Promise<FamilyMember | null> 
   return rows[0] ?? null;
 }
 
-export async function createFamilyMember(data: {
-  given_name: string;
-  surname?: string;
-  birth_date?: string;
-  death_date?: string;
-  birth_place?: string;
-  bio?: string;
-  photo_path?: string;
-}): Promise<FamilyMember> {
+const COLUMNS = ["given_name", "surname", "birth_surname", "nickname", "suffix", "gender", "birth_date", "death_date", "birth_place", "bio", "photo_path"] as const;
+
+export async function createFamilyMember(data: FamilyMemberInput): Promise<FamilyMember> {
   const result = await execute(
-    `INSERT INTO family_members (given_name, surname, birth_date, death_date, birth_place, bio, photo_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.given_name,
-      data.surname ?? null,
-      data.birth_date ?? null,
-      data.death_date ?? null,
-      data.birth_place ?? null,
-      data.bio ?? null,
-      data.photo_path ?? null,
-    ]
+    `INSERT INTO family_members (${COLUMNS.join(", ")}) VALUES (${COLUMNS.map(() => "?").join(", ")})`,
+    COLUMNS.map((c) => data[c] ?? null)
   );
   return (await getFamilyMember(result.lastInsertId))!;
 }
 
-export async function updateFamilyMember(
-  id: number,
-  data: {
-    given_name?: string;
-    surname?: string;
-    birth_date?: string | null;
-    death_date?: string | null;
-    birth_place?: string | null;
-    bio?: string | null;
-    photo_path?: string | null;
-  }
-): Promise<FamilyMember> {
-  const fields = Object.keys(data) as (keyof typeof data)[];
+export async function updateFamilyMember(id: number, data: Partial<FamilyMemberInput>): Promise<FamilyMember> {
+  const fields = COLUMNS.filter((c) => c in data);
   if (fields.length === 0) return (await getFamilyMember(id))!;
-  const setClauses = fields.map((f) => `${f} = ?`).join(", ");
-  const values = fields.map((f) => data[f]);
   await execute(
-    `UPDATE family_members SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`,
-    [...values, id]
+    `UPDATE family_members SET ${fields.map((f) => `${f} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
+    [...fields.map((f) => data[f] ?? null), id]
   );
   return (await getFamilyMember(id))!;
 }
 
-export async function deleteFamilyMember(id: number): Promise<void> {
-  await execute("DELETE FROM family_members WHERE id = ?", [id]);
-}
+/** Deletes the member and every relationship that mentions them. */
+export const deleteFamilyMember = (id: number) => family.deleteFamilyMember(appRunner, id);
 
 export async function listRelationships(memberId?: number): Promise<FamilyRelationship[]> {
   if (memberId !== undefined) {
-    return query<FamilyRelationship>(
-      "SELECT * FROM family_relationships WHERE from_member_id = ? OR to_member_id = ?",
-      [memberId, memberId]
-    );
+    return query<FamilyRelationship>("SELECT * FROM family_relationships WHERE from_member_id = ? OR to_member_id = ?", [memberId, memberId]);
   }
   return query<FamilyRelationship>("SELECT * FROM family_relationships");
 }
 
-export async function addRelationship(
-  fromMemberId: number,
-  toMemberId: number,
-  relationshipType: FamilyRelationship["relationship_type"]
-): Promise<void> {
-  await execute(
-    `INSERT OR IGNORE INTO family_relationships (from_member_id, to_member_id, relationship_type)
-     VALUES (?, ?, ?)`,
-    [fromMemberId, toMemberId, relationshipType]
-  );
+/** Throws a readable Error for self-relationships and duplicates (in either direction). */
+export async function addRelationship(fromMemberId: number, toMemberId: number, type: family.RelationshipType): Promise<void> {
+  await family.addRelationship(appRunner, fromMemberId, toMemberId, type);
+  // A relationship change is an edit to both people (so sync notices).
+  await execute("UPDATE family_members SET updated_at = datetime('now') WHERE id IN (?, ?)", [fromMemberId, toMemberId]);
 }
 
 export async function removeRelationship(id: number): Promise<void> {
-  await execute("DELETE FROM family_relationships WHERE id = ?", [id]);
+  const rows = await query<FamilyRelationship>("SELECT * FROM family_relationships WHERE id = ?", [id]);
+  await family.removeRelationship(appRunner, id);
+  if (rows[0]) {
+    await execute("UPDATE family_members SET updated_at = datetime('now') WHERE id IN (?, ?)", [rows[0].from_member_id, rows[0].to_member_id]);
+  }
 }

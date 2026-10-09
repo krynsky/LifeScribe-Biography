@@ -7,7 +7,7 @@ class FakeStore implements DataStore {
   local: Record<string, LocalRecord[]> = {};
   state: Record<string, SyncState[]> = {};
   nextId = 100;
-  replaceFamilyRelationships?: DataStore["replaceFamilyRelationships"];
+  mergeFamilyRelationships?: DataStore["mergeFamilyRelationships"];
   setCategory?: DataStore["setCategory"];
   setTags?: DataStore["setTags"];
   replaceLinks?: DataStore["replaceLinks"];
@@ -258,10 +258,10 @@ describe("SyncService.refresh — web parity fields", () => {
     expect(summary.errors.length).toBe(1);
   });
 
-  it("rebuilds family relationships onto local member ids", async () => {
+  it("adds the web family relationships onto local member ids", async () => {
     const store = new FakeStore();
     let saved: unknown[] = [];
-    store.replaceFamilyRelationships = async (rels) => { saved = rels; };
+    store.mergeFamilyRelationships = async (rels) => { saved = rels; };
     const adapter = new ImageAdapter({
       family_member: [
         { remote_id: "a", remote_updated_at: "2026-01-02T00:00:00.000Z", fields: { given_name: "A" } },
