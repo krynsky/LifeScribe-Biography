@@ -198,3 +198,38 @@ export function entityLabel(type: EntityType, fields: Record<string, unknown>): 
       return str("filename") || "Item";
   }
 }
+
+/** A join table a published record "owns" (it is the side the user edits links from). */
+export interface PushLinkSpec {
+  table: LinkTable;
+  /** Which side of the table the record is: a = first-named (story/album), b = second-named. */
+  owner: "a" | "b";
+  ownerCol: string;
+  otherCol: string;
+  otherType: EntityType;
+}
+
+/**
+ * Links sent when a record is published. Only the sides the app lets you edit: the story editor owns
+ * its four link tables; milestone, career and place editors own their story and album links.
+ */
+export const PUSH_LINKS: Partial<Record<EntityType, PushLinkSpec[]>> = {
+  story: [
+    { table: "story_milestones", owner: "a", ownerCol: "story_id", otherCol: "milestone_id", otherType: "milestone" },
+    { table: "story_albums", owner: "a", ownerCol: "story_id", otherCol: "album_id", otherType: "album" },
+    { table: "story_map_pins", owner: "a", ownerCol: "story_id", otherCol: "map_pin_id", otherType: "map_pin" },
+    { table: "story_career_entries", owner: "a", ownerCol: "story_id", otherCol: "career_entry_id", otherType: "career" },
+  ],
+  milestone: [
+    { table: "story_milestones", owner: "b", ownerCol: "milestone_id", otherCol: "story_id", otherType: "story" },
+    { table: "album_milestones", owner: "b", ownerCol: "milestone_id", otherCol: "album_id", otherType: "album" },
+  ],
+  career: [
+    { table: "story_career_entries", owner: "b", ownerCol: "career_entry_id", otherCol: "story_id", otherType: "story" },
+    { table: "album_career_entries", owner: "b", ownerCol: "career_entry_id", otherCol: "album_id", otherType: "album" },
+  ],
+  map_pin: [
+    { table: "story_map_pins", owner: "b", ownerCol: "map_pin_id", otherCol: "story_id", otherType: "story" },
+    { table: "album_map_pins", owner: "b", ownerCol: "map_pin_id", otherCol: "album_id", otherType: "album" },
+  ],
+};

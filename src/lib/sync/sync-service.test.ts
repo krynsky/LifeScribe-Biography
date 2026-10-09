@@ -10,6 +10,8 @@ class FakeStore implements DataStore {
   mergeFamilyRelationships?: DataStore["mergeFamilyRelationships"];
   setCategory?: DataStore["setCategory"];
   getPushFields?: DataStore["getPushFields"];
+  getLinkedLocalIds?: DataStore["getLinkedLocalIds"];
+  listFamilyRelationships?: DataStore["listFamilyRelationships"];
   setTags?: DataStore["setTags"];
   replaceLinks?: DataStore["replaceLinks"];
   async listLocal(t: EntityType) { return this.local[t] ?? []; }
@@ -48,6 +50,7 @@ class FakeAdapter implements WebAdapter {
   writeCalls = 0;
   getFamilyRelationships?: WebAdapter["getFamilyRelationships"];
   downloadImage?: WebAdapter["downloadImage"];
+  pushRelations?: WebAdapter["pushRelations"];
   constructor(public remote: Partial<Record<EntityType, RemoteRecord[]>> = {}) {}
   async pullAll() {
     const out: Record<EntityType, RemoteRecord[]> = {
@@ -412,5 +415,88 @@ describe("SyncService.reset", () => {
     await new SyncService(store, adapter, "web-master").reset();
     expect(store.local.story.find((r) => r.local_id === 1)!.fields.title).toBe("my edit"); // kept
     expect(store.local.story.find((r) => r.local_id === 2)!.fields.title).toBe("web 2"); // re-pulled
+  });
+});
+
+describe("SyncService.publish — links and family relationships", () => {
+  const synced = (type: EntityType, id: number, rid: string): SyncState => ({
+    entity_type: type, local_id: id, remote_id: rid,
+    last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("sends a published story's links using web ids, skipping targets the web does not have", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "S" } }];
+    store.state.story = [synced("story", 1, "story-r")];
+    store.state.milestone = [synced("milestone", 10, "ms-r10"), synced("milestone", 11, "ms-r11")];
+    // local milestone 12 was never published, so it has no web id yet
+    store.getLinkedLocalIds = async (table, ownerCol, ownerId) =>
+      table === "story_milestones" && ownerCol === "story_id" && ownerId === 1 ? [10, 12] : [];
+    const adapter = new FakeAdapter();
+    let sent: Parameters<NonNullable<WebAdapter["pushRelations"]>>[0] | undefined;
+    adapter.pushRelations = async (payload) => { sent = payload; return { conflicts: [] }; };
+
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+
+    expect(res.errors).toEqual([]);
+    const ms = sent!.links!.find((l) => l.table === "story_milestones")!;
+    expect(ms).toMatchObject({ owner: "a", owner_remote_id: "story-r", other_remote_ids: ["ms-r10"] });
+    expect(ms.known_other_remote_ids.sort()).toEqual(["ms-r10", "ms-r11"]); // web-only milestones stay untouched
+  });
+
+  it("uses the owner side for a milestone's story and album links", async () => {
+    const store = new FakeStore();
+    store.local.milestone = [{ local_id: 5, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "M" } }];
+    store.state.milestone = [synced("milestone", 5, "ms-r5")];
+    store.state.story = [synced("story", 1, "story-r1")];
+    store.getLinkedLocalIds = async (table) => (table === "story_milestones" ? [1] : []);
+    const adapter = new FakeAdapter();
+    let sent: Parameters<NonNullable<WebAdapter["pushRelations"]>>[0] | undefined;
+    adapter.pushRelations = async (payload) => { sent = payload; return { conflicts: [] }; };
+
+    await new SyncService(store, adapter, "web-master").publish([{ entity_type: "milestone", local_id: 5 }]);
+
+    expect(sent!.links).toContainEqual({ table: "story_milestones", owner: "b", owner_remote_id: "ms-r5", other_remote_ids: ["story-r1"], known_other_remote_ids: ["story-r1"] });
+    expect(sent!.links!.map((l) => l.table).sort()).toEqual(["album_milestones", "story_milestones"]);
+  });
+
+  it("sends a member's relationships relative to that member, only for supported types and known people", async () => {
+    const store = new FakeStore();
+    store.local.family_member = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { given_name: "Me" } }];
+    store.state.family_member = [synced("family_member", 1, "me-r"), synced("family_member", 2, "dad-r"), synced("family_member", 3, "wife-r")];
+    store.listFamilyRelationships = async () => [
+      { from_member_id: 2, to_member_id: 1, relationship_type: "parent" }, // dad is a parent of me
+      { from_member_id: 1, to_member_id: 3, relationship_type: "spouse" },
+      { from_member_id: 1, to_member_id: 9, relationship_type: "sibling" }, // 9 has no web id
+      { from_member_id: 1, to_member_id: 3, relationship_type: "partner" }, // not a type the web accepts
+      { from_member_id: 2, to_member_id: 3, relationship_type: "sibling" }, // does not involve me
+    ];
+    const adapter = new FakeAdapter();
+    let sent: Parameters<NonNullable<WebAdapter["pushRelations"]>>[0] | undefined;
+    adapter.pushRelations = async (payload) => { sent = payload; return { conflicts: [] }; };
+
+    await new SyncService(store, adapter, "web-master").publish([{ entity_type: "family_member", local_id: 1 }]);
+
+    const set = sent!.family_relationships![0];
+    expect(set.member_remote_id).toBe("me-r");
+    expect(set.relationships).toEqual([
+      { other_remote_id: "dad-r", type: "parent", direction: "to" },
+      { other_remote_id: "wife-r", type: "spouse", direction: "from" },
+    ]);
+    expect(set.known_remote_ids.sort()).toEqual(["dad-r", "me-r", "wife-r"]);
+  });
+
+  it("reports problems the web returns and sends nothing when no links apply", async () => {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "S" } }];
+    store.state.story = [synced("story", 1, "story-r")];
+    store.getLinkedLocalIds = async () => [];
+    const adapter = new FakeAdapter();
+    adapter.pushRelations = async () => ({ conflicts: ["links:story_albums:story-r:not_found"] });
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(res.errors).toEqual(["links: links:story_albums:story-r:not_found"]);
+
+    const quiet = new SyncService(new FakeStore(), new FakeAdapter(), "web-master");
+    expect((await quiet.publish([])).errors).toEqual([]);
   });
 });

@@ -115,7 +115,7 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
           <>
             <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
               These will be sent to your website. <strong>New</strong> items are created there; <strong>changed</strong> items update the version on your site. Untick anything you want to keep local for now.
-              Stories, text, dates, categories and tags are sent; photos and links between items are not sent yet.
+              Text, dates, categories, tags, links between items and family relationships are sent; photos are not sent yet.
             </p>
             <div className="space-y-4">
               {groups.map((g) => (

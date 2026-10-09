@@ -3,7 +3,7 @@ import { exists, mkdir, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch } from "@tauri-apps/plugin-http";
 import { ENTITIES, entityDef, relationFields, writableColumns, type EntityType } from "./registry";
 import { getSyncToken, getSyncUrl } from "./config";
-import type { RemoteRecord, RemoteRelationship, WebAdapter } from "./types";
+import type { LinkSetPayload, RelationshipSetPayload, RemoteRecord, RemoteRelationship, WebAdapter } from "./types";
 
 interface ApiResponse<T> {
   data: T;
@@ -147,6 +147,11 @@ export class RestWebAdapter implements WebAdapter {
       }
     }
     return { remoteIdMap, remoteUpdatedAt, conflicts };
+  }
+
+  async pushRelations(payload: { links?: LinkSetPayload[]; family_relationships?: RelationshipSetPayload[] }): Promise<{ conflicts: string[] }> {
+    const result = await api<{ conflicts?: string[] }>("POST", "/sync/push", payload);
+    return { conflicts: result.conflicts ?? [] };
   }
 
   async deleteRemote(type: EntityType, remoteId: string): Promise<void> {

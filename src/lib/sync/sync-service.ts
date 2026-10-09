@@ -1,7 +1,7 @@
-import { ENTITIES, entityDef, entityLabel, type EntityType } from "./registry";
+import { ENTITIES, PUSH_LINKS, entityDef, entityLabel, type EntityType } from "./registry";
 import { decide } from "./reconcile";
 import { LOCAL_IMAGES_WARNING, hasLocalImages } from "./local-images";
-import type { DataStore, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
+import type { DataStore, LinkSetPayload, RelationshipSetPayload, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
 
 export interface ConflictItem {
   entity_type: EntityType;
@@ -192,6 +192,7 @@ export class SyncService {
   ): Promise<{ published: number; errors: string[] }> {
     const result = { published: 0, errors: [] as string[] };
     if (this.mode === "standalone") return result;
+    const publishedRecords: Array<{ type: EntityType; localId: number; remoteId: string }> = [];
 
     const byType = new Map<EntityType, number[]>();
     for (const it of items) {
@@ -233,12 +234,93 @@ export class SyncService {
             last_synced_remote_at: remoteUpdatedAt[rec.local_id] ?? nowIso(),
           });
           result.published++;
+          publishedRecords.push({ type, localId: rec.local_id, remoteId });
         }
       } catch (e) {
         result.errors.push(`${type}: ${(e as Error).message}`);
       }
     }
+    // Links and family relationships go last, once every published record has a web id.
+    if (publishedRecords.length > 0) {
+      try {
+        await this.pushRelations(publishedRecords, result, onProgress);
+      } catch (e) {
+        result.errors.push(`links: ${(e as Error).message}`);
+      }
+    }
     return result;
+  }
+
+  /**
+   * Send the links (and family relationships) of the records just published. Only targets that have a
+   * web id can be linked; others are skipped and will link the next time they are published.
+   */
+  private async pushRelations(
+    published: Array<{ type: EntityType; localId: number; remoteId: string }>,
+    result: { published: number; errors: string[] },
+    onProgress?: (msg: string) => void
+  ): Promise<void> {
+    if (!this.adapter.pushRelations) return;
+    const links: LinkSetPayload[] = [];
+    const relationshipSets: RelationshipSetPayload[] = [];
+
+    const remoteIds = new Map<EntityType, Map<number, string>>();
+    const remoteIdOf = async (type: EntityType, localId: number) => {
+      if (!remoteIds.has(type)) {
+        const map = new Map<number, string>();
+        for (const st of await this.store.listSyncState(type)) if (st.remote_id) map.set(st.local_id, st.remote_id);
+        remoteIds.set(type, map);
+      }
+      return remoteIds.get(type)!.get(localId);
+    };
+    const knownRemoteIds = async (type: EntityType) => {
+      await remoteIdOf(type, -1);
+      return [...remoteIds.get(type)!.values()];
+    };
+
+    for (const rec of published) {
+      for (const spec of PUSH_LINKS[rec.type] ?? []) {
+        if (!this.store.getLinkedLocalIds) continue;
+        const localOthers = await this.store.getLinkedLocalIds(spec.table, spec.ownerCol, rec.localId);
+        const others: string[] = [];
+        for (const id of localOthers) {
+          const rid = await remoteIdOf(spec.otherType, id);
+          if (rid) others.push(rid);
+        }
+        links.push({
+          table: spec.table,
+          owner: spec.owner,
+          owner_remote_id: rec.remoteId,
+          other_remote_ids: others,
+          known_other_remote_ids: await knownRemoteIds(spec.otherType),
+        });
+      }
+    }
+
+    if (this.store.listFamilyRelationships) {
+      const all = await this.store.listFamilyRelationships();
+      const known = await knownRemoteIds("family_member");
+      for (const rec of published.filter((p) => p.type === "family_member")) {
+        const relationships: RelationshipSetPayload["relationships"] = [];
+        for (const r of all) {
+          const type = r.relationship_type;
+          if (type !== "parent" && type !== "child" && type !== "sibling" && type !== "spouse") continue;
+          const fromThis = r.from_member_id === rec.localId;
+          if (!fromThis && r.to_member_id !== rec.localId) continue;
+          const rid = await remoteIdOf("family_member", fromThis ? r.to_member_id : r.from_member_id);
+          if (rid) relationships.push({ other_remote_id: rid, type, direction: fromThis ? "from" : "to" });
+        }
+        relationshipSets.push({ member_remote_id: rec.remoteId, relationships, known_remote_ids: known });
+      }
+    }
+
+    if (links.length === 0 && relationshipSets.length === 0) return;
+    onProgress?.("Publishing links and relationships…");
+    const { conflicts } = await this.adapter.pushRelations({
+      ...(links.length ? { links } : {}),
+      ...(relationshipSets.length ? { family_relationships: relationshipSets } : {}),
+    });
+    for (const c of conflicts) result.errors.push(`links: ${c}`);
   }
 
   private async applyRemote(

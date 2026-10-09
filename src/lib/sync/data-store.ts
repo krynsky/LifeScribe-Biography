@@ -1,7 +1,7 @@
 import { query, execute } from "../db";
 import { appRunner } from "../data/sql";
-import { replaceLinks, type LinkTable } from "../data/links";
-import { mergeRelationships } from "../data/family";
+import { getLinkedIds, replaceLinks, type LinkTable } from "../data/links";
+import { listRelationships, mergeRelationships } from "../data/family";
 import { getTagNames, setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
 import { entityDef, pushableColumns, writableColumns, type EntityType } from "./registry";
 import type { DataStore, LocalRecord, SyncState } from "./types";
@@ -101,6 +101,14 @@ export class SqlDataStore implements DataStore {
       `UPDATE media SET album_id = ?, file_size = COALESCE(?, file_size), remote_url = COALESCE(?, remote_url) WHERE id = ?`,
       [album_id, file_size, remote_url, localId]
     );
+  }
+
+  async getLinkedLocalIds(table: LinkTable, ownerCol: string, ownerId: number): Promise<number[]> {
+    return getLinkedIds(appRunner, table, ownerCol, ownerId);
+  }
+
+  async listFamilyRelationships(): Promise<Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>> {
+    return listRelationships(appRunner);
   }
 
   async getPushFields(type: EntityType, localId: number): Promise<Record<string, unknown> | null> {

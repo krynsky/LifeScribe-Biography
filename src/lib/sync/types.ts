@@ -43,6 +43,22 @@ export interface RemoteRelationship {
   type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
 }
 
+/** One owner's links in a join table, expressed with web ids (the shape the push API expects). */
+export interface LinkSetPayload {
+  table: LinkTable;
+  owner: "a" | "b";
+  owner_remote_id: string;
+  other_remote_ids: string[];
+  known_other_remote_ids: string[];
+}
+
+/** One family member's relationships, relative to that member, with web ids. */
+export interface RelationshipSetPayload {
+  member_remote_id: string;
+  relationships: Array<{ other_remote_id: string; type: "parent" | "child" | "sibling" | "spouse"; direction: "from" | "to" }>;
+  known_remote_ids: string[];
+}
+
 /** A local record with changes the web does not have yet. */
 export interface UnpublishedItem {
   entity_type: EntityType;
@@ -87,6 +103,10 @@ export interface DataStore {
    * its category (name/color/icon) and tag names. Falls back to getLocal(...).fields when absent.
    */
   getPushFields?(type: EntityType, localId: number): Promise<Record<string, unknown> | null>;
+  /** Local ids on the other side of a link table for one owner row. */
+  getLinkedLocalIds?(table: LinkTable, ownerCol: string, ownerId: number): Promise<number[]>;
+  /** Every local family relationship (from/to member ids). */
+  listFamilyRelationships?(): Promise<Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>>;
   /** Assign (or clear, with null) the category of a local row, creating the category when new. */
   setCategory?(type: EntityType, localId: number, cat: { name: string; color: string | null; icon: string | null } | null): Promise<void>;
   /** Replace a local row's tags with exactly these names. */
@@ -115,6 +135,8 @@ export interface WebAdapter {
     conflicts: string[];
   }>;
   deleteRemote(type: EntityType, remoteId: string): Promise<void>;
+  /** Push link sets and family relationship sets (web ids). Returns any problems the web reported. */
+  pushRelations?(payload: { links?: LinkSetPayload[]; family_relationships?: RelationshipSetPayload[] }): Promise<{ conflicts: string[] }>;
   /** Download one media file to local storage; returns the local file path. */
   downloadMedia(remote: RemoteRecord): Promise<string>;
   /** Download a web image (story cover, photo, logo…) to local storage; returns the local file path. */
