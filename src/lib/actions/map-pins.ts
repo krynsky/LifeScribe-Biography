@@ -1,6 +1,8 @@
 import { query, execute } from "../db";
 import type { MapPin } from "../models";
 import { CATEGORY_SELECT, categoryJoin } from "../data/select";
+import { appRunner } from "../data/sql";
+import { deleteEntityLinks } from "../data/entity-links";
 
 export async function listMapPins(): Promise<MapPin[]> {
   return query<MapPin>(
@@ -18,17 +20,19 @@ export async function getMapPin(id: number): Promise<MapPin | null> {
 
 export async function createMapPin(data: {
   name: string;
-  description?: string;
+  description?: string | null;
   latitude: number;
   longitude: number;
-  address?: string;
-  visit_date?: string;
+  address?: string | null;
+  visit_date?: string | null;
   pin_type?: MapPin["pin_type"];
   color?: string;
+  image_path?: string | null;
+  category_id?: number | null;
 }): Promise<MapPin> {
   const result = await execute(
-    `INSERT INTO map_pins (name, description, latitude, longitude, address, visit_date, pin_type, color)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO map_pins (name, description, latitude, longitude, address, visit_date, pin_type, color, image_path, category_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.name,
       data.description ?? null,
@@ -38,6 +42,8 @@ export async function createMapPin(data: {
       data.visit_date ?? null,
       data.pin_type ?? "place",
       data.color ?? "#3D7A8A",
+      data.image_path ?? null,
+      data.category_id ?? null,
     ]
   );
   return (await getMapPin(result.lastInsertId))!;
@@ -59,6 +65,7 @@ export async function updateMapPin(
 }
 
 export async function deleteMapPin(id: number): Promise<void> {
+  await deleteEntityLinks(appRunner, "map_pin", id);
   await execute("DELETE FROM map_pins WHERE id = ?", [id]);
 }
 

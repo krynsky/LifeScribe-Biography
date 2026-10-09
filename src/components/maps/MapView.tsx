@@ -19,9 +19,13 @@ interface MapViewProps {
   onPinClick?: (pin: MapPin) => void;
   onMapClick?: (lat: number, lng: number) => void;
   height?: string;
+  /** Pan/zoom the map here whenever this value changes (e.g. after a place search). */
+  focus?: { lat: number; lng: number; zoom?: number } | null;
+  /** A not-yet-saved location, drawn as a ring so the user sees where a new pin will go. */
+  draft?: { lat: number; lng: number } | null;
 }
 
-export default function MapView({ pins, onPinClick, onMapClick, height = "500px" }: MapViewProps) {
+export default function MapView({ pins, onPinClick, onMapClick, height = "500px", focus, draft }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   // Keep callback refs so the map event handler always calls the latest version
@@ -105,6 +109,27 @@ export default function MapView({ pins, onPinClick, onMapClick, height = "500px"
       });
     });
   }, [pins, onPinClick]);
+
+  // Pan to a searched/selected place.
+  useEffect(() => {
+    if (!focus || !mapRef.current) return;
+    (mapRef.current as { setView: (c: [number, number], z: number) => void }).setView([focus.lat, focus.lng], focus.zoom ?? 13);
+  }, [focus]);
+
+  // Draw the draft location.
+  const draftLayerRef = useRef<{ remove: () => void } | null>(null);
+  useEffect(() => {
+    if (!mapRef.current) return;
+    draftLayerRef.current?.remove();
+    draftLayerRef.current = null;
+    if (!draft) return;
+    import("leaflet").then((L) => {
+      if (!mapRef.current) return;
+      const layer = L.circleMarker([draft.lat, draft.lng], { radius: 11, color: "#C0504D", weight: 3, fillOpacity: 0.15 });
+      layer.addTo(mapRef.current as never);
+      draftLayerRef.current = layer;
+    });
+  }, [draft]);
 
   return (
     <div

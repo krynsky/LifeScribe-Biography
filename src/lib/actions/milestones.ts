@@ -3,10 +3,11 @@ import type { Milestone } from "../models";
 import { CATEGORY_SELECT, categoryJoin, tagsSelect } from "../data/select";
 import { appRunner } from "../data/sql";
 import { ensureCategory, setTags } from "../data/taxonomy";
+import { deleteEntityLinks } from "../data/entity-links";
 
 export interface CreateMilestoneInput {
   title: string;
-  description?: string;
+  description?: string | null;
   date: string;
   date_precision?: "year" | "month" | "day";
   /** Category name (created if new). Prefer category_id when you already have the id. */
@@ -77,5 +78,6 @@ export async function updateMilestone(
 }
 
 export async function deleteMilestone(id: number): Promise<void> {
+  await deleteEntityLinks(appRunner, "milestone", id);
   await execute("DELETE FROM milestones WHERE id = ?", [id]);
 }

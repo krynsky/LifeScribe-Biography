@@ -30,7 +30,8 @@
       "allow": [
         { "url": "https://lifescribe.us/**" },
         { "url": "https://files.lifescribe.us/**" },
-        { "url": "https://img.youtube.com/**" }
+        { "url": "https://img.youtube.com/**" },
+        { "url": "https://nominatim.openstreetmap.org/**" }
       ]
     },
     "sql:default",

@@ -81,3 +81,5 @@ Phases 1-6 work with no web account. Phase 7 is the optional connection.
 
 - **Phase 1 (foundation):** done and committed.
 - **Phase 2 (stories and rich-text editor):** done. Stories have cover photo (upload or from gallery), category, tags, year/month/day date, summary, status, related entries and delete, all autosaved. The editor has text style, color/highlight, sub/superscript, checklist, code block, link and embed panels, table controls and an image picker.
+- **Phase 3 (timeline, career, places):** done. Milestones: end date, category, image, linked stories and albums. Career: employment type, month/year dates, logo, category, links. Places: image, category, links, manual coordinates, map click and place search (needs internet; manual entry works offline). Reordering is not built: the web has no drag-to-reorder UI for these either.
+

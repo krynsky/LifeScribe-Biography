@@ -1,6 +1,8 @@
 import { query, execute } from "../db";
 import type { CareerEntry } from "../models";
 import { CATEGORY_SELECT, categoryJoin } from "../data/select";
+import { appRunner } from "../data/sql";
+import { deleteEntityLinks } from "../data/entity-links";
 
 export async function listCareerEntries(): Promise<CareerEntry[]> {
   return query<CareerEntry>(
@@ -20,18 +22,20 @@ export async function getCareerEntry(id: number): Promise<CareerEntry | null> {
 export async function createCareerEntry(data: {
   entry_type?: "job" | "education";
   organization: string;
-  title?: string;
-  description?: string;
-  start_date?: string;
-  end_date?: string;
+  title?: string | null;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
   is_current?: boolean;
-  location?: string;
-  logo_path?: string;
+  location?: string | null;
+  logo_path?: string | null;
+  employment_type?: string | null;
+  category_id?: number | null;
 }): Promise<CareerEntry> {
   const result = await execute(
     `INSERT INTO career_entries
-      (entry_type, organization, title, description, start_date, end_date, is_current, location, logo_path)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (entry_type, organization, title, description, start_date, end_date, is_current, location, logo_path, employment_type, category_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.entry_type ?? "job",
       data.organization,
@@ -42,6 +46,8 @@ export async function createCareerEntry(data: {
       data.is_current ? 1 : 0,
       data.location ?? null,
       data.logo_path ?? null,
+      data.employment_type ?? null,
+      data.category_id ?? null,
     ]
   );
   return (await getCareerEntry(result.lastInsertId))!;
@@ -67,5 +73,6 @@ export async function updateCareerEntry(
 }
 
 export async function deleteCareerEntry(id: number): Promise<void> {
+  await deleteEntityLinks(appRunner, "career", id);
   await execute("DELETE FROM career_entries WHERE id = ?", [id]);
 }

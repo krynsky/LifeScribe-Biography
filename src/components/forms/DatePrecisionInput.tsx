@@ -9,12 +9,14 @@ interface DatePrecisionInputProps {
   onChange: (value: { date: string | null; precision: DatePrecision }) => void;
   label?: string;
   required?: boolean;
+  /** Hide the day picker (career dates are month + year only). */
+  showDay?: boolean;
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** Year (required) + optional month + optional day. Leaving month/day blank sets the precision, like the web editor. */
-export default function DatePrecisionInput({ date, precision, onChange, label = "Date", required }: DatePrecisionInputProps) {
+export default function DatePrecisionInput({ date, precision, onChange, label = "Date", required, showDay = true }: DatePrecisionInputProps) {
   const [parts, setParts] = useState<DateParts>(() => dateToParts(date, precision));
 
   // Re-sync when a different record is loaded into the form. Skipped when the incoming value is
@@ -32,7 +34,7 @@ export default function DatePrecisionInput({ date, precision, onChange, label = 
 
   function update(next: DateParts) {
     // A day only makes sense with a month.
-    if (!next.month) next = { ...next, day: "" };
+    if (!next.month || !showDay) next = { ...next, day: "" };
     setParts(next);
     // Don't report half-typed years (e.g. "20") as dates; wait for four digits or an empty field.
     if (next.year.length > 0 && next.year.length < 4) return;
@@ -70,14 +72,14 @@ export default function DatePrecisionInput({ date, precision, onChange, label = 
             </option>
           ))}
         </select>
-        <select value={parts.day} onChange={(e) => update({ ...parts, day: e.target.value })} disabled={!parts.month} className="w-28 px-3 py-2 rounded-lg border text-sm disabled:opacity-50" style={field} aria-label={`${label} day`}>
+        {showDay && <select value={parts.day} onChange={(e) => update({ ...parts, day: e.target.value })} disabled={!parts.month} className="w-28 px-3 py-2 rounded-lg border text-sm disabled:opacity-50" style={field} aria-label={`${label} day`}>
           <option value="">Day (opt.)</option>
           {Array.from({ length: days }, (_, i) => (
             <option key={i + 1} value={i + 1}>
               {i + 1}
             </option>
           ))}
-        </select>
+        </select>}
       </div>
       {invalid && (
         <p className="text-xs mt-1" style={{ color: "var(--color-error)" }}>
