@@ -1,8 +1,12 @@
 import { appLocalDataDir, join } from "@tauri-apps/api/path";
-import { exists, mkdir, writeFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { fetch } from "@tauri-apps/plugin-http";
 import { ENTITIES, entityDef, relationFields, writableColumns, type EntityType } from "./registry";
 import { getSyncToken, getSyncUrl } from "./config";
+import { query, execute } from "../db";
+import { hashBytes, imageMimeType } from "../image-library";
+import { buildMultipart } from "./multipart";
+import { prepareForUpload } from "./shrink-image";
 import type { LinkSetPayload, RelationshipSetPayload, RemoteRecord, RemoteRelationship, WebAdapter } from "./types";
 
 interface ApiResponse<T> {
@@ -41,6 +45,35 @@ function hashUrl(url: string): string {
   let h = 5381;
   for (let i = 0; i < url.length; i++) h = ((h << 5) + h + url.charCodeAt(i)) >>> 0;
   return h.toString(36);
+}
+
+/** POST a multipart body (photo upload) and return the `data` of the JSON response. */
+async function postMultipart<T>(path: string, fields: Record<string, string | null | undefined>, file: { filename: string; mime: string; bytes: Uint8Array }): Promise<T> {
+  const baseUrl = getSyncUrl().replace(/\/$/, "");
+  const { body, contentType } = buildMultipart(fields, { field: "file", ...file });
+  const resp = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": contentType, Authorization: `Bearer ${getSyncToken()}` },
+    body: body.buffer as ArrayBuffer,
+  });
+  const text = await resp.text();
+  let json: { data?: T; error?: string } = {};
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* non-JSON error body */
+  }
+  if (!resp.ok || json.error) throw new Error(json.error ?? `Upload failed (${resp.status}): ${text.substring(0, 120)}`);
+  return json.data as T;
+}
+
+/** Read a local photo, with a helpful message when the app is not allowed to open that file. */
+async function readLocalImage(path: string): Promise<Uint8Array> {
+  try {
+    return await readFile(path);
+  } catch {
+    throw new Error("Could not read the photo file. If it is outside the app, use Settings → Photo library to copy photos into the app first.");
+  }
 }
 
 function toRemoteRecords(def: ReturnType<typeof entityDef>, rows: Array<Record<string, unknown>>): RemoteRecord[] {
@@ -152,6 +185,40 @@ export class RestWebAdapter implements WebAdapter {
   async pushRelations(payload: { links?: LinkSetPayload[]; family_relationships?: RelationshipSetPayload[] }): Promise<{ conflicts: string[] }> {
     const result = await api<{ conflicts?: string[] }>("POST", "/sync/push", payload);
     return { conflicts: result.conflicts ?? [] };
+  }
+
+  async uploadImageFile(path: string): Promise<string> {
+    const bytes = await readLocalImage(path);
+    const hash = await hashBytes(bytes);
+    const cached = await query<{ url: string }>("SELECT url FROM uploaded_images WHERE content_hash = ?", [hash]);
+    if (cached[0]) return cached[0].url;
+
+    const prepared = await prepareForUpload(bytes, imageMimeType(path));
+    const filename = path.split(/[\\/]/).pop() ?? "image.jpg";
+    const { url } = await postMultipart<{ url: string }>("/sync/image", {}, { filename, mime: prepared.mime, bytes: prepared.bytes });
+    await execute("INSERT OR REPLACE INTO uploaded_images (content_hash, url) VALUES (?, ?)", [hash, url]);
+    return url;
+  }
+
+  async uploadMediaFile(path: string, opts: { albumRemoteId: string; filename: string; caption: string | null }): Promise<{ mediaId: string; url: string }> {
+    const bytes = await readLocalImage(path);
+    const prepared = await prepareForUpload(bytes, imageMimeType(path));
+    return postMultipart<{ mediaId: string; url: string }>(
+      "/sync/media",
+      { albumId: opts.albumRemoteId, caption: opts.caption, filename: opts.filename },
+      { filename: opts.filename, mime: prepared.mime, bytes: prepared.bytes }
+    );
+  }
+
+  async addMediaLink(opts: { url: string; thumbnailUrl: string | null; type: "image" | "video"; filename: string; albumRemoteId: string; caption: string | null }): Promise<{ mediaId: string; url: string }> {
+    return api<{ mediaId: string; url: string }>("POST", "/sync/media-link", {
+      url: opts.url,
+      thumbnail_url: opts.thumbnailUrl,
+      type: opts.type,
+      filename: opts.filename,
+      album_id: opts.albumRemoteId,
+      caption: opts.caption,
+    });
   }
 
   async deleteRemote(type: EntityType, remoteId: string): Promise<void> {

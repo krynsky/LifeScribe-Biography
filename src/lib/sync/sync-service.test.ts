@@ -12,6 +12,8 @@ class FakeStore implements DataStore {
   getPushFields?: DataStore["getPushFields"];
   getLinkedLocalIds?: DataStore["getLinkedLocalIds"];
   listFamilyRelationships?: DataStore["listFamilyRelationships"];
+  listAlbumMedia?: DataStore["listAlbumMedia"];
+  recordMediaUploaded?: DataStore["recordMediaUploaded"];
   setTags?: DataStore["setTags"];
   replaceLinks?: DataStore["replaceLinks"];
   async listLocal(t: EntityType) { return this.local[t] ?? []; }
@@ -51,6 +53,9 @@ class FakeAdapter implements WebAdapter {
   getFamilyRelationships?: WebAdapter["getFamilyRelationships"];
   downloadImage?: WebAdapter["downloadImage"];
   pushRelations?: WebAdapter["pushRelations"];
+  uploadImageFile?: WebAdapter["uploadImageFile"];
+  uploadMediaFile?: WebAdapter["uploadMediaFile"];
+  addMediaLink?: WebAdapter["addMediaLink"];
   constructor(public remote: Partial<Record<EntityType, RemoteRecord[]>> = {}) {}
   async pullAll() {
     const out: Record<EntityType, RemoteRecord[]> = {
@@ -360,7 +365,7 @@ describe("SyncService.publish — new records and full payload", () => {
       return { remoteIdMap: { 7: "new-remote" }, remoteUpdatedAt: { 7: "2026-02-01T00:00:00.000Z" }, conflicts: [] };
     };
     const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "milestone", local_id: 7 }]);
-    expect(res).toEqual({ published: 1, errors: [] });
+    expect(res).toEqual({ published: 1, errors: [], photos: 0 });
     expect(sent[0].remote_id).toBeNull();
     expect(sent[0].fields).toMatchObject({ end_date: "2020-05-01", category: "Travel" });
     const st = await store.getSyncState("milestone", 7);
@@ -384,7 +389,7 @@ describe("SyncService.publish — new records and full payload", () => {
 });
 
 describe("SyncService.listUnpublished — local photo warning", () => {
-  it("warns about story bodies that contain photos stored on this computer", async () => {
+  it("notes that story bodies with photos from this computer will be uploaded", async () => {
     const store = new FakeStore();
     const withLocal = JSON.stringify({ type: "doc", content: [{ type: "image", attrs: { src: "http://asset.localhost/C%3A/a.jpg" } }] });
     store.local.story = [
@@ -392,7 +397,7 @@ describe("SyncService.listUnpublished — local photo warning", () => {
       { local_id: 2, updated_at: "2026-01-01T00:00:00.000Z", fields: { title: "Plain", content: "{}" } },
     ];
     const list = await new SyncService(store, new FakeAdapter(), "web-master").listUnpublished();
-    expect(list.find((i) => i.local_id === 1)?.warning).toMatch(/photos stored on this computer/);
+    expect(list.find((i) => i.local_id === 1)?.warning).toMatch(/will be uploaded/);
     expect(list.find((i) => i.local_id === 2)?.warning).toBeUndefined();
   });
 });
@@ -498,5 +503,126 @@ describe("SyncService.publish — links and family relationships", () => {
 
     const quiet = new SyncService(new FakeStore(), new FakeAdapter(), "web-master");
     expect((await quiet.publish([])).errors).toEqual([]);
+  });
+});
+
+describe("SyncService.publish — photos", () => {
+  const synced = (type: EntityType, id: number, rid: string): SyncState => ({
+    entity_type: type, local_id: id, remote_id: rid,
+    last_synced_at: "2026-01-01T00:00:00.000Z", last_synced_remote_at: "2026-01-01T00:00:00.000Z",
+  });
+
+  function setup(fields: Record<string, unknown>) {
+    const store = new FakeStore();
+    store.local.story = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { title: "S" } }];
+    store.state.story = [synced("story", 1, "story-r")];
+    store.getPushFields = async () => ({ title: "S", ...fields });
+    const adapter = new FakeAdapter();
+    let sent: Record<string, unknown> = {};
+    adapter.push = async (_t, records) => {
+      sent = records[0].fields;
+      return { remoteIdMap: { 1: "story-r" }, remoteUpdatedAt: { 1: "2026-02-01T00:00:00.000Z" }, conflicts: [] };
+    };
+    return { store, adapter, sent: () => sent };
+  }
+
+  it("uploads a local cover image and sends the website address instead of the file path", async () => {
+    const { store, adapter, sent } = setup({ featured_image_url: "C:\\app\\images\\cover.jpg" });
+    const uploaded: string[] = [];
+    adapter.uploadImageFile = async (path) => { uploaded.push(path); return "https://files.lifescribe.us/cover.jpg"; };
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(uploaded).toEqual(["C:\\app\\images\\cover.jpg"]);
+    expect(sent().featured_image_url).toBe("https://files.lifescribe.us/cover.jpg");
+    expect(res).toMatchObject({ published: 1, errors: [], photos: 1 });
+  });
+
+  it("does not re-upload a photo that was downloaded from the website, and never clears an empty one", async () => {
+    const { store, adapter, sent } = setup({ featured_image_url: "C:\\Users\\me\\AppData\\Local\\com.lifescribe.app\\media\\img-abc1.jpg" });
+    let calls = 0;
+    adapter.uploadImageFile = async () => { calls++; return "https://x/y.jpg"; };
+    await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(calls).toBe(0);
+    expect("featured_image_url" in sent()).toBe(false);
+
+    const empty = setup({ featured_image_url: null });
+    empty.adapter.uploadImageFile = async () => { calls++; return "x"; };
+    await new SyncService(empty.store, empty.adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(calls).toBe(0);
+    expect("featured_image_url" in empty.sent()).toBe(false);
+  });
+
+  it("still publishes the record when a photo upload fails, and reports it", async () => {
+    const { store, adapter, sent } = setup({ featured_image_url: "C:\\app\\images\\big.jpg" });
+    adapter.uploadImageFile = async () => { throw new Error("too large"); };
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(res.published).toBe(1);
+    expect(res.errors).toEqual(["story:1 photo: too large"]);
+    expect("featured_image_url" in sent()).toBe(false);
+  });
+
+  it("uploads photos inside the story text and rewrites them", async () => {
+    const body = JSON.stringify({ type: "doc", content: [{ type: "image", attrs: { src: "http://asset.localhost/C%3A%5Cimg%5Cp.jpg" } }] });
+    const { store, adapter, sent } = setup({ content: body });
+    adapter.uploadImageFile = async (path) => `https://files.lifescribe.us/${path.split("\\").pop()}`;
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "story", local_id: 1 }]);
+    expect(JSON.parse(sent().content as string).content[0].attrs.src).toBe("https://files.lifescribe.us/p.jpg");
+    expect(res.photos).toBe(1);
+  });
+});
+
+describe("SyncService.publish — album photos and cover", () => {
+  it("uploads each new photo and video link once, records them, and sets the cover", async () => {
+    const store = new FakeStore();
+    store.local.album = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { name: "Trip" } }];
+    const recorded: Array<[number, string, string]> = [];
+    store.listAlbumMedia = async () => ({
+      coverMediaId: 11,
+      media: [
+        { id: 10, file_path: "C:\\a.jpg", thumbnail_path: null, filename: "a.jpg", caption: "Hello", source_url: null, mime_type: "image/jpeg", remote_url: null },
+        { id: 11, file_path: "C:\\b.jpg", thumbnail_path: null, filename: "b.jpg", caption: null, source_url: null, mime_type: "image/jpeg", remote_url: null },
+        { id: 12, file_path: "https://img.youtube.com/vi/x/hqdefault.jpg", thumbnail_path: null, filename: "YouTube – x", caption: null, source_url: "https://www.youtube.com/embed/xxxxxxxxxxx", mime_type: "video/mp4", remote_url: "https://img.youtube.com/vi/x/hqdefault.jpg" },
+        { id: 13, file_path: "C:\\done.jpg", thumbnail_path: null, filename: "done.jpg", caption: null, source_url: null, mime_type: "image/jpeg", remote_url: "https://files/done.jpg" },
+      ],
+    });
+    store.recordMediaUploaded = async (id, remoteId, url) => { recorded.push([id, remoteId, url]); await store.putSyncState({ entity_type: "media", local_id: id, remote_id: remoteId, last_synced_at: "t", last_synced_remote_at: "t" }); };
+    store.state.media = [{ entity_type: "media", local_id: 13, remote_id: "m13", last_synced_at: "t", last_synced_remote_at: "t" }];
+
+    const adapter = new FakeAdapter();
+    const files: Array<[string, string, string | null]> = [];
+    adapter.uploadMediaFile = async (path, o) => { files.push([path, o.albumRemoteId, o.caption]); return { mediaId: `m-${path}`, url: `https://files/${o.filename}` }; };
+    const links: string[] = [];
+    adapter.addMediaLink = async (o) => { links.push(`${o.type}:${o.url}`); return { mediaId: "m-link", url: o.url }; };
+    const pushes: Array<Record<string, unknown>> = [];
+    adapter.push = async (_t, records) => {
+      pushes.push(records[0].fields);
+      return { remoteIdMap: { 1: "alb-r" }, remoteUpdatedAt: { 1: "2026-02-01T00:00:00.000Z" }, conflicts: [] };
+    };
+
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "album", local_id: 1 }]);
+
+    expect(files).toEqual([["C:\\a.jpg", "alb-r", "Hello"], ["C:\\b.jpg", "alb-r", null]]); // the already-uploaded one is skipped
+    expect(links).toEqual(["video:https://www.youtube.com/embed/xxxxxxxxxxx"]);
+    expect(recorded.map((r) => r[0])).toEqual([10, 11, 12]);
+    expect(res).toMatchObject({ published: 1, photos: 3, errors: [] });
+    expect(pushes).toHaveLength(2); // the album, then a second update carrying the cover
+    expect(pushes[1].cover_image).toBe("https://files/b.jpg");
+  });
+
+  it("reports a photo that fails and carries on with the rest", async () => {
+    const store = new FakeStore();
+    store.local.album = [{ local_id: 1, updated_at: "2026-01-03T00:00:00.000Z", fields: { name: "Trip" } }];
+    store.listAlbumMedia = async () => ({
+      coverMediaId: null,
+      media: [
+        { id: 1, file_path: "C:\\bad.jpg", thumbnail_path: null, filename: "bad.jpg", caption: null, source_url: null, mime_type: "image/jpeg", remote_url: null },
+        { id: 2, file_path: "C:\\ok.jpg", thumbnail_path: null, filename: "ok.jpg", caption: null, source_url: null, mime_type: "image/jpeg", remote_url: null },
+      ],
+    });
+    store.recordMediaUploaded = async () => {};
+    const adapter = new FakeAdapter();
+    adapter.uploadMediaFile = async (path) => { if (path.includes("bad")) throw new Error("Could not read the photo file."); return { mediaId: "m", url: "https://f/ok.jpg" }; };
+    const res = await new SyncService(store, adapter, "web-master").publish([{ entity_type: "album", local_id: 1 }]);
+    expect(res.photos).toBe(1);
+    expect(res.errors).toEqual(["media:1 bad.jpg: Could not read the photo file."]);
   });
 });

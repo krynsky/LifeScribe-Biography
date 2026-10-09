@@ -145,6 +145,10 @@ export async function insertMedia(data: {
       data.remote_url ?? null,
     ]
   );
+  if (result.rowsAffected > 0 && data.album_id) {
+    // Adding a photo is an edit to its album (so the album shows up as changed for publishing).
+    await execute("UPDATE albums SET updated_at = datetime('now') WHERE id = ?", [data.album_id]);
+  }
   // INSERT OR IGNORE: a duplicate import_hash inserts nothing, and lastInsertId
   // then points at an unrelated earlier row — return the existing media instead.
   if (result.rowsAffected === 0 && data.import_hash) {

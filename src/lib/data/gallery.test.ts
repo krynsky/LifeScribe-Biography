@@ -66,6 +66,17 @@ describe("deleteMedia", () => {
   });
 });
 
+describe("album edit tracking", () => {
+  it("deleting a photo marks its album as edited", async () => {
+    const { db, runner } = seed();
+    db.exec("UPDATE albums SET updated_at = '2000-01-01 00:00:00'");
+    await deleteMedia(runner, 1);
+    const row = db.prepare("SELECT updated_at FROM albums WHERE id = 1").get() as { updated_at: string };
+    expect(row.updated_at > "2020").toBe(true);
+    expect((db.prepare("SELECT updated_at FROM albums WHERE id = 2").get() as { updated_at: string }).updated_at).toBe("2000-01-01 00:00:00");
+  });
+});
+
 describe("deleteAlbum", () => {
   it("keeps the photos but removes the album, its tags and its links", async () => {
     const { db, runner } = seed();

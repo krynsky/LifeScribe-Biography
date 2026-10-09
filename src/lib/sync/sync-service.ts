@@ -1,7 +1,8 @@
 import { ENTITIES, PUSH_LINKS, entityDef, entityLabel, type EntityType } from "./registry";
 import { decide } from "./reconcile";
-import { LOCAL_IMAGES_WARNING, hasLocalImages } from "./local-images";
-import type { DataStore, LinkSetPayload, RelationshipSetPayload, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
+import { LOCAL_IMAGES_NOTE, hasLocalImages, isWebDownloadedImage } from "./local-images";
+import { rewriteLocalImages } from "./story-images";
+import type { DataStore, LinkSetPayload, LocalMedia, RelationshipSetPayload, RemoteRecord, SyncMode, SyncState, UnpublishedItem, WebAdapter } from "./types";
 
 export interface ConflictItem {
   entity_type: EntityType;
@@ -189,8 +190,8 @@ export class SyncService {
   async publish(
     items: Array<{ entity_type: EntityType; local_id: number }>,
     onProgress?: (msg: string) => void
-  ): Promise<{ published: number; errors: string[] }> {
-    const result = { published: 0, errors: [] as string[] };
+  ): Promise<{ published: number; errors: string[]; photos: number }> {
+    const result = { published: 0, errors: [] as string[], photos: 0 };
     if (this.mode === "standalone") return result;
     const publishedRecords: Array<{ type: EntityType; localId: number; remoteId: string }> = [];
 
@@ -209,6 +210,7 @@ export class SyncService {
         if (!local) continue;
         // Full payload (extra columns, category, tags) when the store can build it.
         const fields = (await this.store.getPushFields?.(type, localId)) ?? local.fields;
+        await this.preparePhotos(type, localId, fields, result, onProgress);
         records.push({
           local_id: localId,
           remote_id: st?.remote_id ?? null,
@@ -240,6 +242,16 @@ export class SyncService {
         result.errors.push(`${type}: ${(e as Error).message}`);
       }
     }
+    // Album photos and covers need the albums to exist on the web first.
+    const albums = publishedRecords.filter((p) => p.type === "album");
+    if (albums.length > 0) {
+      try {
+        await this.publishAlbumMedia(albums, result, onProgress);
+      } catch (e) {
+        result.errors.push(`photos: ${(e as Error).message}`);
+      }
+    }
+
     // Links and family relationships go last, once every published record has a web id.
     if (publishedRecords.length > 0) {
       try {
@@ -249,6 +261,110 @@ export class SyncService {
       }
     }
     return result;
+  }
+
+  /**
+   * Turn local photo paths in a record's payload into website addresses by uploading them. A photo
+   * that fails to upload is left out (the record still publishes) and reported. Photos that are
+   * unchanged copies of what the site already has are not sent again, and an empty photo never
+   * clears the one on the site.
+   */
+  private async preparePhotos(
+    type: EntityType,
+    localId: number,
+    fields: Record<string, unknown>,
+    result: { errors: string[]; photos: number },
+    onProgress?: (msg: string) => void
+  ): Promise<void> {
+    const upload = this.adapter.uploadImageFile?.bind(this.adapter);
+    for (const img of entityDef(type).images ?? []) {
+      const value = fields[img.remoteField];
+      if (typeof value === "string" && upload && !/^https?:/i.test(value) && !isWebDownloadedImage(value)) {
+        try {
+          onProgress?.("Uploading photos…");
+          fields[img.remoteField] = await upload(value);
+          result.photos++;
+          continue;
+        } catch (e) {
+          result.errors.push(`${type}:${localId} photo: ${(e as Error).message}`);
+        }
+      }
+      if (typeof value === "string" && /^https:\/\//i.test(value)) continue; // already a website address
+      delete fields[img.remoteField];
+    }
+
+    if (type === "story" && upload && typeof fields.content === "string") {
+      const rewritten = await rewriteLocalImages(fields.content, async (path) => {
+        onProgress?.("Uploading photos…");
+        const url = await upload(path);
+        result.photos++;
+        return url;
+      });
+      fields.content = rewritten.content;
+      for (const f of rewritten.failed) result.errors.push(`${type}:${localId} photo in text: ${f.error}`);
+    }
+  }
+
+  /** Upload the photos and linked videos of albums that were just published, then set each album cover. */
+  private async publishAlbumMedia(
+    albums: Array<{ type: EntityType; localId: number; remoteId: string }>,
+    result: { published: number; errors: string[]; photos: number },
+    onProgress?: (msg: string) => void
+  ): Promise<void> {
+    if (!this.store.listAlbumMedia || !this.store.recordMediaUploaded) return;
+    const coversToSet: Array<{ album: (typeof albums)[number]; url: string }> = [];
+
+    for (const album of albums) {
+      const { media, coverMediaId } = await this.store.listAlbumMedia(album.localId);
+      let coverUrl: string | null = null;
+      for (const m of media) {
+        const done = await this.store.getSyncState("media", m.id);
+        let webUrl = done?.remote_id ? m.remote_url : null;
+        if (!done?.remote_id) {
+          try {
+            onProgress?.(`Uploading photos (${media.indexOf(m) + 1} of ${media.length})…`);
+            const uploaded = await this.uploadOneMedia(m, album.remoteId);
+            if (!uploaded) continue;
+            await this.store.recordMediaUploaded(m.id, uploaded.mediaId, uploaded.url, nowIso());
+            webUrl = uploaded.url;
+            result.photos++;
+          } catch (e) {
+            result.errors.push(`media:${m.id} ${m.filename}: ${(e as Error).message}`);
+            continue;
+          }
+        }
+        if (m.id === coverMediaId && webUrl) coverUrl = webUrl;
+      }
+      if (coverUrl) coversToSet.push({ album, url: coverUrl });
+    }
+
+    // The cover is a property of the album, so it is sent as a second small update.
+    for (const { album, url } of coversToSet) {
+      const st = await this.store.getSyncState("album", album.localId);
+      const fields = (await this.store.getPushFields?.("album", album.localId)) ?? (await this.store.getLocal("album", album.localId))?.fields;
+      if (!fields) continue;
+      const { remoteUpdatedAt, remoteIdMap } = await this.adapter.push("album", [
+        { local_id: album.localId, remote_id: album.remoteId, last_synced_remote_at: st?.last_synced_remote_at ?? null, fields: { ...fields, cover_image: url } },
+      ]);
+      if (remoteIdMap[album.localId] && st) {
+        await this.store.putSyncState({ ...st, last_synced_remote_at: remoteUpdatedAt[album.localId] ?? st.last_synced_remote_at });
+      }
+    }
+  }
+
+  /** Upload one gallery item (local photo, image link or video link) to an album. Null when there is nothing to upload. */
+  private async uploadOneMedia(m: LocalMedia, albumRemoteId: string): Promise<{ mediaId: string; url: string } | null> {
+    if (m.source_url) {
+      if (!this.adapter.addMediaLink) return null;
+      const thumb = m.remote_url ?? (/^https:/i.test(m.thumbnail_path ?? "") ? m.thumbnail_path : null);
+      return this.adapter.addMediaLink({ url: m.source_url, thumbnailUrl: thumb, type: "video", filename: m.filename, albumRemoteId, caption: m.caption });
+    }
+    if (/^https:\/\//i.test(m.file_path)) {
+      if (!this.adapter.addMediaLink) return null;
+      return this.adapter.addMediaLink({ url: m.file_path, thumbnailUrl: m.file_path, type: "image", filename: m.filename, albumRemoteId, caption: m.caption });
+    }
+    if (!this.adapter.uploadMediaFile) return null;
+    return this.adapter.uploadMediaFile(m.file_path, { albumRemoteId, filename: m.filename, caption: m.caption });
   }
 
   /**
@@ -419,7 +535,7 @@ export class SyncService {
       for (const local of await this.store.listLocal(def.type)) {
         const st = states.get(local.local_id);
         const label = entityLabel(def.type, local.fields);
-        const warning = def.type === "story" && hasLocalImages(local.fields.content) ? LOCAL_IMAGES_WARNING : undefined;
+        const warning = def.type === "story" && hasLocalImages(local.fields.content) ? LOCAL_IMAGES_NOTE : undefined;
         const base = { entity_type: def.type, local_id: local.local_id, label, ...(warning ? { warning } : {}) };
         if (!st || !st.remote_id) {
           if (!def.singleton) out.push({ ...base, kind: "new" });

@@ -4,7 +4,7 @@ import { getLinkedIds, replaceLinks, type LinkTable } from "../data/links";
 import { listRelationships, mergeRelationships } from "../data/family";
 import { getTagNames, setCategoryByName, setTags, type CategorizedTable, type TaggedTable } from "../data/taxonomy";
 import { entityDef, pushableColumns, writableColumns, type EntityType } from "./registry";
-import type { DataStore, LocalRecord, SyncState } from "./types";
+import type { DataStore, LocalMedia, LocalRecord, SyncState } from "./types";
 
 function toLocalRecord(def: ReturnType<typeof entityDef>, row: Record<string, unknown>): LocalRecord {
   const fields: Record<string, unknown> = {};
@@ -103,6 +103,22 @@ export class SqlDataStore implements DataStore {
     );
   }
 
+  async listAlbumMedia(albumLocalId: number): Promise<{ media: LocalMedia[]; coverMediaId: number | null }> {
+    const media = await query<LocalMedia>(
+      `SELECT id, file_path, thumbnail_path, filename, caption, source_url, mime_type, remote_url
+         FROM media WHERE album_id = ? ORDER BY sort_order, id`,
+      [albumLocalId]
+    );
+    const album = await query<{ cover_media_id: number | null }>("SELECT cover_media_id FROM albums WHERE id = ?", [albumLocalId]);
+    return { media, coverMediaId: album[0]?.cover_media_id ?? null };
+  }
+
+  async recordMediaUploaded(mediaLocalId: number, remoteId: string, webUrl: string, updatedAt: string): Promise<void> {
+    // remote_url is what the web's cover address is matched against, so keep it in step with the upload.
+    await execute("UPDATE media SET remote_url = ? WHERE id = ?", [webUrl, mediaLocalId]);
+    await this.putSyncState({ entity_type: "media", local_id: mediaLocalId, remote_id: remoteId, last_synced_at: updatedAt, last_synced_remote_at: updatedAt });
+  }
+
   async getLinkedLocalIds(table: LinkTable, ownerCol: string, ownerId: number): Promise<number[]> {
     return getLinkedIds(appRunner, table, ownerCol, ownerId);
   }
@@ -118,6 +134,8 @@ export class SqlDataStore implements DataStore {
     if (!row) return null;
     const fields: Record<string, unknown> = {};
     for (const c of pushableColumns(def)) fields[c] = row[c] ?? null;
+    // Image fields carry the local file path here; publishing uploads it and swaps in the web address.
+    for (const img of def.images ?? []) fields[img.remoteField] = row[img.pathColumn] ?? null;
     if (def.categorized) {
       const cat = await query<{ name: string; color: string | null; icon: string | null }>(
         `SELECT c.name, c.color, c.icon FROM categories c JOIN ${def.table} t ON t.category_id = c.id WHERE t.id = ?`,

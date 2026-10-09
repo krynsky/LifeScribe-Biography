@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { hasLocalImages } from "./local-images";
+import { hasLocalImages, isWebDownloadedImage } from "./local-images";
+
+describe("isWebDownloadedImage", () => {
+  it("recognises photos fetched from the website, not ones the user added", () => {
+    expect(isWebDownloadedImage("C:\\Users\\me\\AppData\\Local\\com.lifescribe.app\\media\\img-1wydhxj.jpg")).toBe(true);
+    expect(isWebDownloadedImage("/home/me/.local/share/app/media/img-abc123.png")).toBe(true);
+    expect(isWebDownloadedImage("C:\\Users\\me\\AppData\\Local\\com.lifescribe.app\\images\\4f2a9c.jpg")).toBe(false);
+    expect(isWebDownloadedImage("C:\\Users\\me\\Pictures\\img-holiday.jpg")).toBe(false);
+  });
+});
 
 describe("hasLocalImages", () => {
   const doc = (src: string) => JSON.stringify({ type: "doc", content: [{ type: "image", attrs: { src } }] });

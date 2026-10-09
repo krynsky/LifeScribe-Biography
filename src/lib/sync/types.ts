@@ -43,6 +43,20 @@ export interface RemoteRelationship {
   type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
 }
 
+/** A gallery photo/video as publish needs to see it. */
+export interface LocalMedia {
+  id: number;
+  file_path: string;
+  thumbnail_path: string | null;
+  filename: string;
+  caption: string | null;
+  /** Embed URL for videos (YouTube, Vimeo…). */
+  source_url: string | null;
+  mime_type: string | null;
+  /** Web address of the photo (or of a video's thumbnail) when known. */
+  remote_url: string | null;
+}
+
 /** One owner's links in a join table, expressed with web ids (the shape the push API expects). */
 export interface LinkSetPayload {
   table: LinkTable;
@@ -103,6 +117,10 @@ export interface DataStore {
    * its category (name/color/icon) and tag names. Falls back to getLocal(...).fields when absent.
    */
   getPushFields?(type: EntityType, localId: number): Promise<Record<string, unknown> | null>;
+  /** Photos/videos in an album, with the album's chosen cover (media id) if any. */
+  listAlbumMedia?(albumLocalId: number): Promise<{ media: LocalMedia[]; coverMediaId: number | null }>;
+  /** Remember that a local photo now exists on the website (web id + address). */
+  recordMediaUploaded?(mediaLocalId: number, remoteId: string, webUrl: string, updatedAt: string): Promise<void>;
   /** Local ids on the other side of a link table for one owner row. */
   getLinkedLocalIds?(table: LinkTable, ownerCol: string, ownerId: number): Promise<number[]>;
   /** Every local family relationship (from/to member ids). */
@@ -135,6 +153,12 @@ export interface WebAdapter {
     conflicts: string[];
   }>;
   deleteRemote(type: EntityType, remoteId: string): Promise<void>;
+  /** Upload a local image file; returns its public https URL. Already-uploaded files are not sent twice. */
+  uploadImageFile?(path: string): Promise<string>;
+  /** Upload a local photo into an album's gallery. */
+  uploadMediaFile?(path: string, opts: { albumRemoteId: string; filename: string; caption: string | null }): Promise<{ mediaId: string; url: string }>;
+  /** Add a linked image or video (embed) to an album's gallery. */
+  addMediaLink?(opts: { url: string; thumbnailUrl: string | null; type: "image" | "video"; filename: string; albumRemoteId: string; caption: string | null }): Promise<{ mediaId: string; url: string }>;
   /** Push link sets and family relationship sets (web ids). Returns any problems the web reported. */
   pushRelations?(payload: { links?: LinkSetPayload[]; family_relationships?: RelationshipSetPayload[] }): Promise<{ conflicts: string[] }>;
   /** Download one media file to local storage; returns the local file path. */

@@ -33,7 +33,7 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
-  const [result, setResult] = useState<{ published: number; errors: string[] } | null>(null);
+  const [result, setResult] = useState<{ published: number; errors: string[]; photos?: number } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
           <>
             <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
               These will be sent to your website. <strong>New</strong> items are created there; <strong>changed</strong> items update the version on your site. Untick anything you want to keep local for now.
-              Text, dates, categories, tags, links between items and family relationships are sent; photos are not sent yet.
+              Text, dates, categories, tags, links, family relationships and photos are sent. Photos from this computer are uploaded to your website, so publishing photos can take a while.
             </p>
             <div className="space-y-4">
               {groups.map((g) => (
@@ -159,7 +159,8 @@ export default function PublishReviewModal({ open, onClose, onFinished }: Publis
         {result && (
           <div className="space-y-3" role="status">
             <p className="text-sm font-medium" style={{ color: result.published > 0 ? "var(--color-success)" : "var(--color-text)" }}>
-              Published {result.published} item{result.published === 1 ? "" : "s"}.
+              Published {result.published} item{result.published === 1 ? "" : "s"}
+              {result.photos ? ` and uploaded ${result.photos} photo${result.photos === 1 ? "" : "s"}` : ""}.
             </p>
             {result.errors.length > 0 && (
               <div>

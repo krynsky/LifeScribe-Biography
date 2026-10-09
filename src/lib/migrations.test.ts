@@ -27,6 +27,16 @@ describe("migrations", () => {
   });
 });
 
+describe("0009_uploaded_images", () => {
+  it("creates the upload cache keyed by content hash", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    db.prepare("INSERT INTO uploaded_images (content_hash, url) VALUES (?, ?)").run("abc", "https://x/a.jpg");
+    expect(() => db.prepare("INSERT INTO uploaded_images (content_hash, url) VALUES (?, ?)").run("abc", "https://x/b.jpg")).toThrow();
+    expect(db.prepare("SELECT url FROM uploaded_images WHERE content_hash = 'abc'").get()).toEqual({ url: "https://x/a.jpg" });
+  });
+});
+
 describe("0008_biography_subject_name", () => {
   it("adds the subject name columns, keeping the existing biography row", () => {
     const db = new Database(":memory:");

@@ -58,6 +58,8 @@ export async function setAlbumCover(r: SqlRunner, albumId: number, mediaId: numb
 
 /** Remove one photo/video. If it was an album's cover, that album falls back to its first photo. */
 export async function deleteMedia(r: SqlRunner, id: number): Promise<void> {
+  // Removing a photo is an edit to its album (so the album shows up as changed for publishing).
+  await r.execute("UPDATE albums SET updated_at = datetime('now') WHERE id = (SELECT album_id FROM media WHERE id = ?)", [id]);
   await r.execute("UPDATE albums SET cover_media_id = NULL WHERE cover_media_id = ?", [id]);
   await r.execute("DELETE FROM media_map_pins WHERE media_id = ?", [id]);
   await r.execute("DELETE FROM media WHERE id = ?", [id]);

@@ -530,5 +530,17 @@ ALTER TABLE biography ADD COLUMN subject_maiden_name TEXT;
 ALTER TABLE biography ADD COLUMN subject_suffix TEXT
 `,
   ],
+  // Remembers which photo files were already uploaded to the website (by content hash), so
+  // publishing again never uploads the same photo twice.
+  [
+    "0009_uploaded_images",
+    `
+CREATE TABLE IF NOT EXISTS uploaded_images (
+  content_hash TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+)
+`,
+  ],
 ];
 
