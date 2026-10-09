@@ -73,6 +73,7 @@ export const ENTITIES: EntityDef[] = [
     remoteKey: "biography",
     singleton: true,
     columns: ["title", "tagline", "bio"],
+    extraColumns: ["subject_first_name", "subject_middle_name", "subject_last_name", "subject_maiden_name", "subject_suffix"],
     images: [
       { remoteField: "banner_image_url", pathColumn: "cover_photo_path" },
       { remoteField: "profile_image_url", pathColumn: "avatar_photo_path" },

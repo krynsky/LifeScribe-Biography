@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createCategory, listCategories, type CategoryRow } from "@/lib/actions/taxonomy";
+import { CATEGORY_COLORS } from "@/lib/category-colors";
 
 interface CategoryPickerProps {
   value: number | null;
@@ -7,14 +8,14 @@ interface CategoryPickerProps {
   label?: string;
 }
 
-const COLORS = ["#6366F1", "#3D7A8A", "#4A9B6F", "#D4A86A", "#C0504D", "#7C5CBF", "#3B82F6", "#EC4899"];
+const COLORS = CATEGORY_COLORS;
 
 /** Choose one shared category, or create a new one inline. Categories are shared by every section. */
 export default function CategoryPicker({ value, onChange, label = "Category" }: CategoryPickerProps) {
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState<string>(COLORS[1]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

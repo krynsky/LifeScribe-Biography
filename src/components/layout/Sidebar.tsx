@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Eye,
   Pencil,
+  UserCircle,
+  Tags,
 } from "lucide-react";
 import { useViewMode } from "@/lib/view-mode";
 
@@ -31,7 +33,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Family Tree", path: "/family-tree", icon: Users },
   { label: "Career", path: "/career", icon: Briefcase },
   { label: "Maps & Places", path: "/maps", icon: MapPin },
-  { label: "Import", path: "/import", icon: Download, matchPrefix: true, separator: true },
+  { label: "Profile", path: "/profile", icon: UserCircle, separator: true },
+  { label: "Categories & Tags", path: "/organize", icon: Tags },
+  { label: "Import", path: "/import", icon: Download, matchPrefix: true },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 

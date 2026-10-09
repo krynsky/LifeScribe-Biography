@@ -17,6 +17,8 @@ import PhotoImportPage from "@/pages/import/PhotoImportPage";
 import ArchiveImportPage from "@/pages/import/ArchiveImportPage";
 import ReviewPage from "@/pages/import/ReviewPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
+import ProfilePage from "@/pages/profile/ProfilePage";
+import OrganizePage from "@/pages/organize/OrganizePage";
 
 // Read-mode views (web-style presentation, shown when the sidebar toggle is on "Read")
 import HomeView from "@/views/HomeView";
@@ -129,6 +131,18 @@ const reviewRoute = createRoute({
   component: ReviewPage,
 });
 
+// Profile and categories/tags (edit tools; the same page in Read mode)
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile",
+  component: ProfilePage,
+});
+const organizeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organize",
+  component: OrganizePage,
+});
+
 // Settings
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -151,6 +165,8 @@ const routeTree = rootRoute.addChildren([
   photoImportRoute,
   archiveImportRoute,
   reviewRoute,
+  profileRoute,
+  organizeRoute,
   settingsRoute,
 ]);
 

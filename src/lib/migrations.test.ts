@@ -27,6 +27,18 @@ describe("migrations", () => {
   });
 });
 
+describe("0008_biography_subject_name", () => {
+  it("adds the subject name columns, keeping the existing biography row", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    const cols = (db.prepare("PRAGMA table_info(biography)").all() as { name: string }[]).map((c) => c.name);
+    for (const c of ["subject_first_name", "subject_middle_name", "subject_last_name", "subject_maiden_name", "subject_suffix"]) {
+      expect(cols).toContain(c);
+    }
+    expect(db.prepare("SELECT title FROM biography WHERE id = 1").get()).toEqual({ title: "My Life Story" });
+  });
+});
+
 describe("0007_categories_tags_links backfill", () => {
   function seededAtV6() {
     const db = new Database(":memory:");

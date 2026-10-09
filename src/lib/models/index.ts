@@ -9,6 +9,11 @@ export interface Biography {
   birth_place: string | null;
   cover_photo_path: string | null;
   avatar_photo_path: string | null;
+  subject_first_name?: string | null;
+  subject_middle_name?: string | null;
+  subject_last_name?: string | null;
+  subject_maiden_name?: string | null;
+  subject_suffix?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -519,5 +519,16 @@ ALTER TABLE albums DROP COLUMN category_icon;
 ALTER TABLE albums DROP COLUMN tags;
 `,
   ],
+  // Profile: the formal name of the person the biography is about (same fields as the web site settings).
+  [
+    "0008_biography_subject_name",
+    `
+ALTER TABLE biography ADD COLUMN subject_first_name TEXT;
+ALTER TABLE biography ADD COLUMN subject_middle_name TEXT;
+ALTER TABLE biography ADD COLUMN subject_last_name TEXT;
+ALTER TABLE biography ADD COLUMN subject_maiden_name TEXT;
+ALTER TABLE biography ADD COLUMN subject_suffix TEXT
+`,
+  ],
 ];
 
