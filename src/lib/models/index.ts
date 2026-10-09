@@ -27,6 +27,7 @@ export interface Story {
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
+  category_id?: number | null;
   tags?: string | null; // JSON array of tag names
   author_name?: string | null;
   related?: string | null; // JSON {milestones, albums, map_pins, career}
@@ -47,6 +48,7 @@ export interface Milestone {
   // Web-owned display fields mirrored by sync (category is the column above)
   category_color?: string | null;
   category_icon?: string | null;
+  category_id?: number | null;
   end_date?: string | null;
   end_date_precision?: string | null;
   linked_stories?: string | null; // JSON [{remote_id,title}]
@@ -67,6 +69,7 @@ export interface Album {
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
+  category_id?: number | null;
   tags?: string | null; // JSON array of tag names
   position?: number | null;
   created_at: string;
@@ -145,6 +148,7 @@ export interface CareerEntry {
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
+  category_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -167,6 +171,7 @@ export interface MapPin {
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
+  category_id?: number | null;
   created_at: string;
   updated_at: string;
 }

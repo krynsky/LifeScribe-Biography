@@ -2,14 +2,15 @@ import { query, execute } from "../db";
 import type { Story } from "../models";
 import { CATEGORY_SELECT, categoryJoin, tagsSelect } from "../data/select";
 import { appRunner } from "../data/sql";
-import { ensureCategory, setTags } from "../data/taxonomy";
+import { setTags } from "../data/taxonomy";
+import { uniqueStorySlug } from "../data/slug";
 
 export interface CreateStoryInput {
   title: string;
-  content?: string;
-  excerpt?: string;
+  content?: string | null;
+  excerpt?: string | null;
   status?: "draft" | "published";
-  event_date?: string;
+  event_date?: string | null;
   event_date_precision?: "year" | "month" | "day";
   featured_image_path?: string | null;
   category_id?: number | null;
@@ -19,14 +20,6 @@ export interface CreateStoryInput {
 
 export interface UpdateStoryInput extends Partial<CreateStoryInput> {
   id: number;
-}
-
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .substring(0, 80);
 }
 
 export async function listStories(filters?: {
@@ -63,7 +56,7 @@ export async function getStory(id: number): Promise<Story | null> {
 }
 
 export async function createStory(input: CreateStoryInput): Promise<Story> {
-  const slug = slugify(input.title);
+  const slug = await uniqueStorySlug(appRunner, input.title);
   const result = await execute(
     `INSERT INTO stories (title, slug, content, excerpt, status, event_date, event_date_precision, featured_image_path, category_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -87,7 +80,18 @@ export async function updateStory(input: UpdateStoryInput): Promise<Story> {
   const { id, tags, ...data } = input;
   const patch: Record<string, unknown> = { ...data };
   if (tags) await setTags(appRunner, "stories", id, tags);
-  if (data.title !== undefined) patch.slug = slugify(data.title);
+  if (data.title !== undefined) {
+    // The slug is the story's address. Only rewrite it while the story is an unpublished draft that
+    // isn't linked to the web, so published links and synced stories keep a stable URL.
+    const current = await getStory(id);
+    const linked = await query<{ n: number }>(
+      "SELECT 1 AS n FROM sync_state WHERE entity_type = 'story' AND local_id = ? AND remote_id IS NOT NULL",
+      [id]
+    );
+    if (current && current.status === "draft" && linked.length === 0) {
+      patch.slug = await uniqueStorySlug(appRunner, data.title, id);
+    }
+  }
   const fields = Object.keys(patch);
   if (fields.length === 0) {
     if (tags) await execute("UPDATE stories SET updated_at = datetime('now') WHERE id = ?", [id]);
@@ -105,6 +109,10 @@ export async function updateStory(input: UpdateStoryInput): Promise<Story> {
 }
 
 export async function deleteStory(id: number): Promise<void> {
+  // Remove join rows explicitly rather than relying on ON DELETE CASCADE.
+  for (const table of ["story_tags", "story_milestones", "story_albums", "story_map_pins", "story_career_entries"]) {
+    await execute(`DELETE FROM ${table} WHERE story_id = ?`, [id]);
+  }
   await execute("DELETE FROM stories WHERE id = ?", [id]);
 }
 

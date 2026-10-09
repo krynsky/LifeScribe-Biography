@@ -21,6 +21,8 @@ export default function DatePrecisionInput({ date, precision, onChange, label = 
   // just what the user's own typing produced, so half-typed input (e.g. year "2") isn't erased.
   useEffect(() => {
     setParts((current) => {
+      // Mid-typing a year (1-3 digits): the user's own input is not a date yet, don't overwrite it.
+      if (current.year.length > 0 && current.year.length < 4) return current;
       const mine = partsToDate(current);
       const sameDate = mine.date === (date ?? null);
       const samePrecision = mine.date === null || mine.precision === (precision ?? "day").toString().toLowerCase();
@@ -32,6 +34,8 @@ export default function DatePrecisionInput({ date, precision, onChange, label = 
     // A day only makes sense with a month.
     if (!next.month) next = { ...next, day: "" };
     setParts(next);
+    // Don't report half-typed years (e.g. "20") as dates; wait for four digits or an empty field.
+    if (next.year.length > 0 && next.year.length < 4) return;
     onChange(partsToDate(next));
   }
 

@@ -1,6 +1,5 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useCallback, useRef } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 // Tiptap core
@@ -52,7 +51,7 @@ import { VimeoEmbed } from "./extensions/vimeo-embed";
 import { OEmbedBlock } from "./extensions/oembed-block";
 
 import EditorToolbar from "./EditorToolbar";
-import { copyIntoLibrary } from "@/lib/images";
+import MediaPickerModal from "@/components/forms/MediaPickerModal";
 
 interface StoryEditorProps {
   content: string | null;
@@ -154,22 +153,11 @@ export default function StoryEditor({
   const wordCount = charCountStorage?.words() ?? 0;
   const charCount = charCountStorage?.characters() ?? 0;
 
-  const handleImageInsert = useCallback(async () => {
-    if (!editor) return;
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "webp", "bmp"] }],
-      });
-      if (selected && typeof selected === "string") {
-        // Copy into the app's image library so the story keeps working if the original moves.
-        const url = convertFileSrc(await copyIntoLibrary(selected));
-        editor.chain().focus().setImage({ src: url, alt: selected.split(/[\\/]/).pop() }).run();
-      }
-    } catch (err) {
-      console.error("Image insert failed:", err);
-    }
-  }, [editor]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  function insertImage(path: string) {
+    editor?.chain().focus().setImage({ src: convertFileSrc(path), alt: path.split(/[\\/]/).pop() }).run();
+  }
 
   if (!editor) return null;
 
@@ -187,10 +175,11 @@ export default function StoryEditor({
         boxShadow: "var(--shadow-card)",
       }}
     >
-      {!readOnly && <EditorToolbar editor={editor} onImageInsert={handleImageInsert} />}
+      {!readOnly && <EditorToolbar editor={editor} onImageInsert={() => setPickerOpen(true)} />}
       <div className="flex-1 overflow-y-auto p-6">
         <EditorContent editor={editor} className="tiptap min-h-[400px]" />
       </div>
+      <MediaPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={insertImage} title="Insert an image" />
       <div
         className="flex items-center gap-4 px-6 py-2 border-t text-xs"
         style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}

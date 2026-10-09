@@ -60,6 +60,9 @@ The web has manual `position` ordering for timeline, albums, pins and family; th
 ### 10. Testing (risk)
 Almost everything in the app UI is unreachable from automated tests today (Tauri-only). Each phase needs unit tests for the data layer plus a short manual checklist, and the sync push needs a test against a throwaway web database, not production.
 
+### 11. In-story images use machine-specific addresses (found in phase 2)
+Images inserted into a story body are stored as Tauri asset URLs that contain the absolute path on this computer. That is fine for local use, but a published or exported copy needs a portable form (for example an app-relative library reference rewritten on publish). Settle this in phase 7 before publishing story bodies to the web.
+
 ## 3. Proposed build order
 
 Each phase ships on its own and keeps the app usable.
@@ -73,3 +76,8 @@ Each phase ships on its own and keeps the app usable.
 7. **Sync push (issue 3, 8):** web API extension, conflict step, backup, deletes, then end-to-end test.
 
 Phases 1-6 work with no web account. Phase 7 is the optional connection.
+
+## 4. Progress
+
+- **Phase 1 (foundation):** done and committed.
+- **Phase 2 (stories and rich-text editor):** done. Stories have cover photo (upload or from gallery), category, tags, year/month/day date, summary, status, related entries and delete, all autosaved. The editor has text style, color/highlight, sub/superscript, checklist, code block, link and embed panels, table controls and an image picker.

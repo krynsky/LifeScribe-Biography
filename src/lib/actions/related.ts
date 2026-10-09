@@ -1,5 +1,5 @@
 import { appRunner } from "../data/sql";
-import { albumsLinkedTo, getStoryRelations, storiesLinkedTo, type LinkedItem, type StoryRelations } from "../data/links";
+import { albumsLinkedTo, getLinkedIds, getStoryRelations, replaceLinks, storiesLinkedTo, type LinkedItem, type LinkTable, type StoryRelations } from "../data/links";
 import { listAlbums } from "./gallery";
 
 export type { LinkedItem, StoryRelations };
@@ -84,4 +84,54 @@ export async function loadMapPinLinks(): Promise<LinkContext> {
     if (t) thumbnails.set(id, t);
   }
   return { stories, albums, thumbnails };
+}
+
+// ── Editing a story's Related Entries ────────────────────────────────────────
+
+export type StoryLinkKind = "milestones" | "albums" | "mapPins" | "career";
+
+const STORY_LINK_TABLES: Record<StoryLinkKind, { table: LinkTable; otherCol: string }> = {
+  milestones: { table: "story_milestones", otherCol: "milestone_id" },
+  albums: { table: "story_albums", otherCol: "album_id" },
+  mapPins: { table: "story_map_pins", otherCol: "map_pin_id" },
+  career: { table: "story_career_entries", otherCol: "career_entry_id" },
+};
+
+export interface LinkableEntry {
+  id: number;
+  label: string;
+  detail: string | null;
+}
+
+/** Everything a story can be linked to, labelled for a checklist. */
+export async function listLinkableEntries(): Promise<Record<StoryLinkKind, LinkableEntry[]>> {
+  const [milestones, albums, pins, career] = await Promise.all([
+    appRunner.select<{ id: number; title: string; date: string }>("SELECT id, title, date FROM milestones ORDER BY date"),
+    appRunner.select<{ id: number; name: string }>("SELECT id, name FROM albums ORDER BY name"),
+    appRunner.select<{ id: number; name: string }>("SELECT id, name FROM map_pins ORDER BY name"),
+    appRunner.select<{ id: number; organization: string; title: string | null }>(
+      "SELECT id, organization, title FROM career_entries ORDER BY COALESCE(start_date, '') DESC"
+    ),
+  ]);
+  return {
+    milestones: milestones.map((m) => ({ id: m.id, label: m.title, detail: m.date.substring(0, 4) })),
+    albums: albums.map((a) => ({ id: a.id, label: a.name, detail: null })),
+    mapPins: pins.map((p) => ({ id: p.id, label: p.name, detail: null })),
+    career: career.map((c) => ({ id: c.id, label: c.title ? `${c.title} @ ${c.organization}` : c.organization, detail: null })),
+  };
+}
+
+export async function getStoryLinkIds(storyId: number): Promise<Record<StoryLinkKind, number[]>> {
+  const entries = await Promise.all(
+    (Object.keys(STORY_LINK_TABLES) as StoryLinkKind[]).map(
+      async (k) => [k, await getLinkedIds(appRunner, STORY_LINK_TABLES[k].table, "story_id", storyId)] as const
+    )
+  );
+  return Object.fromEntries(entries) as Record<StoryLinkKind, number[]>;
+}
+
+export async function setStoryLinks(storyId: number, kind: StoryLinkKind, ids: number[]): Promise<void> {
+  await replaceLinks(appRunner, STORY_LINK_TABLES[kind].table, "story_id", storyId, ids);
+  // A link change counts as an edit to the story (sync, "last edited").
+  await appRunner.execute("UPDATE stories SET updated_at = datetime('now') WHERE id = ?", [storyId]);
 }
