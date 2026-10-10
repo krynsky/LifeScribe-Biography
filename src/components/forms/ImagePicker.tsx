@@ -37,7 +37,13 @@ export default function ImagePicker({ value, onChange, label = "Image", shape = 
   }
 
   const box =
-    shape === "circle" ? "w-24 h-24 rounded-full" : shape === "square" ? "w-24 h-24 rounded-lg" : "w-full h-32 rounded-lg";
+    shape === "circle"
+      ? "w-24 h-24 rounded-full"
+      : shape === "square"
+        ? "w-24 h-24 rounded-lg"
+        : src
+          ? "w-full rounded-lg" // wide pictures (covers, banners) show in full, not cropped
+          : "w-full h-32 rounded-lg";
 
   return (
     <div>
@@ -46,7 +52,7 @@ export default function ImagePicker({ value, onChange, label = "Image", shape = 
       </label>
       <div className="flex items-center gap-3">
         <div className={`${box} overflow-hidden flex items-center justify-center border flex-shrink-0`} style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}>
-          {src ? <img src={src} alt="" className="w-full h-full object-cover" /> : <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{emptyHint}</span>}
+          {src ? <img src={src} alt="" className={shape === "wide" ? "w-full h-auto max-h-96 object-contain" : "w-full h-full object-cover"} /> : <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{emptyHint}</span>}
         </div>
         {shape !== "wide" && (
           <div className="flex flex-col gap-2">

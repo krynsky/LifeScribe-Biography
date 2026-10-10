@@ -30,6 +30,8 @@ export default function MapsView() {
 
   if (loading) return <ReadLoading />;
 
+  const selectedStories = (selected && links?.stories.get(selected.id)) || [];
+  const selectedAlbums = (selected && links?.albums.get(selected.id)) || [];
   const detailImg = selected ? imageSrc(selected.image_path) ?? imageSrc(links?.thumbnails.get(selected.id)) : null;
 
   return (
@@ -61,6 +63,34 @@ export default function MapsView() {
                   </p>
                   {selected.description && (
                     <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{selected.description}</p>
+                  )}
+                  {selectedStories.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>Stories</div>
+                      <ul className="mt-1 space-y-0.5">
+                        {selectedStories.map((st) => (
+                          <li key={st.id}>
+                            <Link to="/stories/$storyId" params={{ storyId: String(st.id) }} className="text-sm hover:underline" style={{ color: "var(--color-primary)" }}>
+                              📖 {st.title}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {selectedAlbums.length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>Galleries</div>
+                      <ul className="mt-1 space-y-0.5">
+                        {selectedAlbums.map((a) => (
+                          <li key={a.id}>
+                            <Link to="/gallery/albums/$albumId" params={{ albumId: String(a.id) }} className="text-sm hover:underline" style={{ color: "#059669" }}>
+                              🖼️ {a.title}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               </div>

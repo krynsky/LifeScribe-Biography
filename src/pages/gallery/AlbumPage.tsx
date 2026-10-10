@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "@tanstack/react-router";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ArrowLeft, ImagePlus, Link2, Pencil, Star, Trash2, Upload } from "lucide-react";
 import AlbumGrid from "@/components/gallery/AlbumGrid";
-import AlbumFormModal from "@/components/gallery/AlbumFormModal";
 import CategoryChip, { TagList } from "@/components/reader/CategoryChip";
 import Modal from "@/components/ui/Modal";
 import { getAlbum, listMedia, updateMedia, deleteMedia, deleteAlbum, setAlbumCover } from "@/lib/actions/gallery";
@@ -21,7 +20,6 @@ export default function AlbumPage() {
   const [album, setAlbum] = useState<Album | null>(null);
   const [photos, setPhotos] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showEdit, setShowEdit] = useState(false);
   const [showUrl, setShowUrl] = useState(false);
   const [captionFor, setCaptionFor] = useState<Media | null>(null);
   const [captionText, setCaptionText] = useState("");
@@ -167,7 +165,7 @@ export default function AlbumPage() {
             <Link2 size={14} />
             Add by Link
           </button>
-          <button onClick={() => setShowEdit(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border" style={outline}>
+          <button onClick={() => navigate({ to: "/gallery/albums/$albumId/edit", params: { albumId: String(id) } })} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border" style={outline}>
             <Pencil size={14} />
             Edit Details
           </button>
@@ -209,7 +207,6 @@ export default function AlbumPage() {
         />
       )}
 
-      <AlbumFormModal open={showEdit} onClose={() => setShowEdit(false)} album={album} onSaved={() => void load()} />
       <AddByLinkModal open={showUrl} onClose={() => setShowUrl(false)} albumId={id} onAdded={() => void load()} />
 
       <Modal open={captionFor !== null} onClose={() => setCaptionFor(null)} title="Caption" maxWidth="440px">

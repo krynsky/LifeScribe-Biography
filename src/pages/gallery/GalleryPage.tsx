@@ -4,7 +4,6 @@ import { Plus, Image, Trash2, Download } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import CategoryChip from "@/components/reader/CategoryChip";
-import AlbumFormModal from "@/components/gallery/AlbumFormModal";
 import { listAlbums, deleteAlbum, type AlbumListItem } from "@/lib/actions/gallery";
 import { imageSrc } from "@/lib/image-src";
 
@@ -12,7 +11,6 @@ export default function GalleryPage() {
   const navigate = useNavigate();
   const [albums, setAlbums] = useState<AlbumListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showNew, setShowNew] = useState(false);
 
   const reload = useCallback(() => listAlbums().then(setAlbums), []);
 
@@ -28,7 +26,7 @@ export default function GalleryPage() {
   }
 
   const newButton = (
-    <button onClick={() => setShowNew(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium" style={{ background: "var(--color-primary)" }}>
+    <button onClick={() => navigate({ to: "/gallery/new" })} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium" style={{ background: "var(--color-primary)" }}>
       <Plus size={14} />
       New Album
     </button>
@@ -95,12 +93,6 @@ export default function GalleryPage() {
           })}
         </div>
       )}
-
-      <AlbumFormModal
-        open={showNew}
-        onClose={() => setShowNew(false)}
-        onSaved={(a) => navigate({ to: "/gallery/albums/$albumId", params: { albumId: String(a.id) } })}
-      />
     </div>
   );
 }

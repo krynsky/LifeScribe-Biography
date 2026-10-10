@@ -7,11 +7,16 @@ import StoryListPage from "@/pages/stories/StoryListPage";
 import StoryEditorPage from "@/pages/stories/StoryEditorPage";
 import NewStoryPage from "@/pages/stories/NewStoryPage";
 import TimelinePage from "@/pages/timeline/TimelinePage";
+import MilestoneEditorPage, { NewMilestonePage } from "@/pages/timeline/MilestoneEditorPage";
 import GalleryPage from "@/pages/gallery/GalleryPage";
 import AlbumPage from "@/pages/gallery/AlbumPage";
+import AlbumEditorPage, { NewAlbumPage } from "@/pages/gallery/AlbumEditorPage";
 import FamilyTreePage from "@/pages/family-tree/FamilyTreePage";
+import MemberEditorPage, { NewMemberPage } from "@/pages/family-tree/MemberEditorPage";
 import CareerPage from "@/pages/career/CareerPage";
+import CareerEditorPage, { NewCareerPage } from "@/pages/career/CareerEditorPage";
 import MapsPage from "@/pages/maps/MapsPage";
+import PinEditorPage, { NewPinPage } from "@/pages/maps/PinEditorPage";
 import ImportHubPage from "@/pages/import/ImportHubPage";
 import PhotoImportPage from "@/pages/import/PhotoImportPage";
 import ArchiveImportPage from "@/pages/import/ArchiveImportPage";
@@ -76,6 +81,17 @@ const timelineRoute = createRoute({
   component: byMode(TimelinePage, TimelineView),
 });
 
+const newMilestoneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/timeline/new",
+  component: NewMilestonePage,
+});
+const milestoneEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/timeline/$milestoneId",
+  component: MilestoneEditorPage,
+});
+
 // Gallery
 const galleryRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -88,11 +104,36 @@ const albumRoute = createRoute({
   component: byMode(AlbumPage, AlbumView),
 });
 
+const newAlbumRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/gallery/new",
+  component: NewAlbumPage,
+});
+const albumEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/gallery/albums/$albumId/edit",
+  component: AlbumEditorPage,
+});
+
 // Family Tree
 const familyTreeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/family-tree",
   component: byMode(FamilyTreePage, FamilyTreeView),
+});
+
+const newMemberRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/family-tree/new",
+  component: NewMemberPage,
+});
+const memberEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/family-tree/$memberId",
+  component: MemberEditorPage,
+  validateSearch: (search: Record<string, unknown>): { created?: string } => ({
+    created: typeof search.created === "string" ? search.created : undefined,
+  }),
 });
 
 // Career
@@ -102,11 +143,38 @@ const careerRoute = createRoute({
   component: byMode(CareerPage, CareerView),
 });
 
+const newCareerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/career/new",
+  component: NewCareerPage,
+});
+const careerEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/career/$entryId",
+  component: CareerEditorPage,
+});
+
 // Maps
 const mapsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/maps",
   component: byMode(MapsPage, MapsView),
+});
+
+const newPinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/maps/new",
+  component: NewPinPage,
+  validateSearch: (search: Record<string, unknown>): { lat?: string; lng?: string; name?: string } => ({
+    lat: typeof search.lat === "string" ? search.lat : undefined,
+    lng: typeof search.lng === "string" ? search.lng : undefined,
+    name: typeof search.name === "string" ? search.name : undefined,
+  }),
+});
+const pinEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/maps/$pinId",
+  component: PinEditorPage,
 });
 
 // Import
@@ -156,11 +224,21 @@ const routeTree = rootRoute.addChildren([
   newStoryRoute,
   storyEditorRoute,
   timelineRoute,
+  newMilestoneRoute,
+  milestoneEditorRoute,
   galleryRoute,
+  newAlbumRoute,
+  albumEditorRoute,
   albumRoute,
   familyTreeRoute,
+  newMemberRoute,
+  memberEditorRoute,
   careerRoute,
+  newCareerRoute,
+  careerEditorRoute,
   mapsRoute,
+  newPinRoute,
+  pinEditorRoute,
   importHubRoute,
   photoImportRoute,
   archiveImportRoute,
