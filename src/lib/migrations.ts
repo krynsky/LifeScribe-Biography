@@ -668,4 +668,9 @@ WHERE id = 1 AND COALESCE(subject_first_name, '') = '' AND COALESCE(subject_last
 ALTER TABLE stories DROP COLUMN author_name
 `,
   ],
+  // A marriage can end: family_relationships.ended = 1 marks a former spouse (shown as "divorced" on the tree).
+  [
+    "0014_relationship_ended",
+    `ALTER TABLE family_relationships ADD COLUMN ended INTEGER NOT NULL DEFAULT 0`,
+  ],
 ];

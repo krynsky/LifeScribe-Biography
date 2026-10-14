@@ -13,6 +13,7 @@ import {
   listFamilyMembers,
   listRelationships,
   removeRelationship,
+  setRelationshipEnded,
   updateFamilyMember,
   type RelationshipType,
 } from "@/lib/actions/family-tree";
@@ -291,6 +292,16 @@ function RelationshipsEditor({ member, members, lines, onChanged }: Relationship
     }
   }
 
+  async function toggleEnded(id: number, ended: boolean) {
+    setBusy(true);
+    try {
+      await setRelationshipEnded(id, ended);
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(id: number) {
     setBusy(true);
     try {
@@ -317,9 +328,22 @@ function RelationshipsEditor({ member, members, lines, onChanged }: Relationship
                 <span>
                   {formatFamilyName(member)} {d.phrase} <strong style={{ color: "var(--color-text)" }}>{formatFamilyName(other)}</strong>
                 </span>
-                <button type="button" onClick={() => void remove(rel.id)} disabled={busy} aria-label={`Remove relationship with ${formatFamilyName(other)}`} className="p-1 rounded" style={{ color: "var(--color-error)" }}>
-                  <X size={13} />
-                </button>
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  {d.type === "spouse" && (
+                    <button
+                      type="button"
+                      onClick={() => void toggleEnded(rel.id, !rel.ended)}
+                      disabled={busy}
+                      className="px-2 py-0.5 rounded border text-xs"
+                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                    >
+                      {rel.ended ? "Mark as married" : "Mark as divorced"}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => void remove(rel.id)} disabled={busy} aria-label={`Remove relationship with ${formatFamilyName(other)}`} className="p-1 rounded" style={{ color: "var(--color-error)" }}>
+                    <X size={13} />
+                  </button>
+                </span>
               </li>
             );
           })}

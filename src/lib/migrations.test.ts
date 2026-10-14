@@ -175,3 +175,13 @@ describe("0013_byline_from_profile", () => {
     expect(db.prepare("SELECT subject_first_name f, subject_last_name l FROM biography WHERE id = 1").get()).toEqual({ f: "Pat", l: null });
   });
 });
+
+describe("0014_relationship_ended", () => {
+  it("adds an ended flag that defaults to a current relationship", () => {
+    const db = new Database(":memory:");
+    migrate(db, 13);
+    db.exec("INSERT INTO family_members (id, given_name) VALUES (1,'A'),(2,'B'); INSERT INTO family_relationships (from_member_id, to_member_id, relationship_type) VALUES (1,2,'spouse')");
+    migrate(db);
+    expect(db.prepare("SELECT ended FROM family_relationships").get()).toEqual({ ended: 0 });
+  });
+});

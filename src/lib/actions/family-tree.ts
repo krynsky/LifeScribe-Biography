@@ -73,3 +73,12 @@ export async function removeRelationship(id: number): Promise<void> {
     await execute("UPDATE family_members SET updated_at = datetime('now') WHERE id IN (?, ?)", [rows[0].from_member_id, rows[0].to_member_id]);
   }
 }
+
+/** Mark a marriage as ended (divorced), or current again. */
+export async function setRelationshipEnded(id: number, ended: boolean): Promise<void> {
+  const rows = await query<FamilyRelationship>("SELECT * FROM family_relationships WHERE id = ?", [id]);
+  await family.setRelationshipEnded(appRunner, id, ended);
+  if (rows[0]) {
+    await execute("UPDATE family_members SET updated_at = datetime('now') WHERE id IN (?, ?)", [rows[0].from_member_id, rows[0].to_member_id]);
+  }
+}

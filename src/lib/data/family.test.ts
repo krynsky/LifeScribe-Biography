@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createTestDb } from "./test-runner";
-import { addRelationship, deleteFamilyMember, describeRelationship, listRelationships, mergeRelationships, relationshipKey, removeRelationship } from "./family";
+import { addRelationship, deleteFamilyMember, describeRelationship, listRelationships, relationshipKey, removeRelationship, setRelationshipEnded } from "./family";
 
 function seed() {
   const t = createTestDb();
@@ -62,18 +62,19 @@ describe("deleteFamilyMember", () => {
   });
 });
 
-describe("mergeRelationships", () => {
-  it("adds only what's missing and never removes local relationships", async () => {
+describe("ended marriages", () => {
+  it("marks only spouse relationships as ended and words them in the past tense", async () => {
     const { runner } = seed();
-    await addRelationship(runner, 1, 2, "parent"); // local-only knowledge
-    const added = await mergeRelationships(runner, [
-      { from_member_id: 2, to_member_id: 1, relationship_type: "child" }, // same fact as local
-      { from_member_id: 2, to_member_id: 3, relationship_type: "spouse" },
-      { from_member_id: 3, to_member_id: 2, relationship_type: "spouse" }, // duplicate within the batch
-      { from_member_id: 1, to_member_id: 1, relationship_type: "sibling" }, // self
-      { from_member_id: 1, to_member_id: 3, relationship_type: "partner" }, // not modelled
-    ]);
-    expect(added).toBe(1);
-    expect(await listRelationships(runner)).toHaveLength(2);
+    await addRelationship(runner, 1, 2, "spouse");
+    await addRelationship(runner, 1, 3, "parent");
+    const [spouse, parent] = await listRelationships(runner);
+    expect(describeRelationship(spouse, 1)?.phrase).toBe("is married to");
+    await setRelationshipEnded(runner, spouse.id, true);
+    await setRelationshipEnded(runner, parent.id, true); // ignored: not a marriage
+    const after = await listRelationships(runner);
+    expect(after.map((r) => r.ended)).toEqual([1, 0]);
+    expect(describeRelationship(after[0], 2)?.phrase).toBe("was married to");
+    await setRelationshipEnded(runner, spouse.id, false);
+    expect((await listRelationships(runner))[0].ended).toBe(0);
   });
 });

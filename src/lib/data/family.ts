@@ -9,6 +9,8 @@ export interface RelationshipRow {
   from_member_id: number;
   to_member_id: number;
   relationship_type: string;
+  /** 1 when a spouse relationship has ended (divorced). */
+  ended?: number;
 }
 
 /**
@@ -57,12 +59,12 @@ export function describeRelationship(rel: RelationshipRow, memberId: number): { 
   return {
     otherId: fromThisSide ? rel.to_member_id : rel.from_member_id,
     type,
-    phrase: RELATIONSHIP_PHRASES[type],
+    phrase: type === "spouse" && rel.ended ? "was married to" : RELATIONSHIP_PHRASES[type],
   };
 }
 
 export async function listRelationships(r: SqlRunner): Promise<RelationshipRow[]> {
-  return r.select<RelationshipRow>("SELECT id, from_member_id, to_member_id, relationship_type FROM family_relationships ORDER BY id");
+  return r.select<RelationshipRow>("SELECT id, from_member_id, to_member_id, relationship_type, ended FROM family_relationships ORDER BY id");
 }
 
 /** Add a relationship, refusing self-relationships and anything that already exists in either direction. */
@@ -77,6 +79,11 @@ export async function addRelationship(r: SqlRunner, from: number, to: number, ty
   await r.execute("INSERT INTO family_relationships (from_member_id, to_member_id, relationship_type) VALUES (?, ?, ?)", [from, to, type]);
 }
 
+/** Mark a marriage as ended (or current again). Only spouse relationships can end. */
+export async function setRelationshipEnded(r: SqlRunner, id: number, ended: boolean): Promise<void> {
+  await r.execute("UPDATE family_relationships SET ended = ? WHERE id = ? AND relationship_type = 'spouse'", [ended ? 1 : 0, id]);
+}
+
 export async function removeRelationship(r: SqlRunner, id: number): Promise<void> {
   await r.execute("DELETE FROM family_relationships WHERE id = ?", [id]);
 }
@@ -85,29 +92,4 @@ export async function removeRelationship(r: SqlRunner, id: number): Promise<void
 export async function deleteFamilyMember(r: SqlRunner, id: number): Promise<void> {
   await r.execute("DELETE FROM family_relationships WHERE from_member_id = ? OR to_member_id = ?", [id, id]);
   await r.execute("DELETE FROM family_members WHERE id = ?", [id]);
-}
-
-/**
- * Add relationships (by local member id) that aren't already present, in either direction.
- * Never removes anything: relationships created in the app are kept when the web is refreshed.
- */
-export async function mergeRelationships(
-  r: SqlRunner,
-  incoming: Array<{ from_member_id: number; to_member_id: number; relationship_type: string }>
-): Promise<number> {
-  const existing = await listRelationships(r);
-  const seen = new Set(existing.map((e) => relationshipKey(e.from_member_id, e.to_member_id, e.relationship_type)));
-  let added = 0;
-  for (const rel of incoming) {
-    const key = relationshipKey(rel.from_member_id, rel.to_member_id, rel.relationship_type);
-    if (!key || rel.from_member_id === rel.to_member_id || seen.has(key)) continue;
-    await r.execute("INSERT INTO family_relationships (from_member_id, to_member_id, relationship_type) VALUES (?, ?, ?)", [
-      rel.from_member_id,
-      rel.to_member_id,
-      rel.relationship_type,
-    ]);
-    seen.add(key);
-    added++;
-  }
-  return added;
 }

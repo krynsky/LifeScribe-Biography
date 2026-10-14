@@ -128,6 +128,8 @@ export interface FamilyRelationship {
   from_member_id: number;
   to_member_id: number;
   relationship_type: "parent" | "child" | "sibling" | "spouse" | "partner" | "other";
+  /** 1 when a spouse relationship has ended (divorced). */
+  ended?: number;
 }
 
 export interface CareerEntry {

@@ -1,92 +1,20 @@
 import { useCallback, useMemo, useState } from "react";
 import ReactFamilyTree from "react-family-tree";
-import type { Node as FTNode, ExtNode } from "relatives-tree/lib/types";
+import type { ExtNode } from "relatives-tree/lib/types";
 import { imageSrc } from "@/lib/image-src";
 import { formatFamilyName } from "@/lib/reader-utils";
+import { buildNodes } from "@/lib/family-nodes";
 import type { FamilyMember, FamilyRelationship } from "@/lib/models";
 
-const NODE_W = 200;
-const NODE_H = 100;
+// Each person occupies a "slot" on the layout grid; the card is smaller than its slot, so there is
+// clear space between cards (and between generations) for the connecting lines.
+const NODE_W = 250;
+const NODE_H = 160;
+const CARD_W = 200;
+const CARD_H = 92;
 // react-family-tree lays nodes out on a grid of half-width / half-height units.
 const HALF_W = NODE_W / 2;
 const HALF_H = NODE_H / 2;
-
-/**
- * Build relatives-tree nodes from members + relationships, the same way the web
- * bio does: collect parents/children/siblings/spouses, then infer a second
- * parent from a single parent's spouse so couples render together.
- */
-function buildNodes(members: FamilyMember[], rels: FamilyRelationship[]): readonly FTNode[] {
-  // relatives-tree uses const enums; the runtime values are plain strings.
-  type G = FTNode["gender"];
-  type R = FTNode["parents"][number]["type"];
-  const blood = "blood" as unknown as R;
-  const married = "married" as unknown as R;
-
-  const parentMap = new Map<number, Set<number>>();
-  const childMap = new Map<number, Set<number>>();
-  const siblingMap = new Map<number, Set<number>>();
-  const spouseMap = new Map<number, Set<number>>();
-  const ensure = (map: Map<number, Set<number>>, id: number) => {
-    let s = map.get(id);
-    if (!s) map.set(id, (s = new Set()));
-    return s;
-  };
-
-  for (const m of members) {
-    ensure(parentMap, m.id);
-    ensure(childMap, m.id);
-    ensure(siblingMap, m.id);
-    ensure(spouseMap, m.id);
-  }
-
-  const known = new Set(members.map((m) => m.id));
-  for (const r of rels) {
-    const a = r.from_member_id;
-    const b = r.to_member_id;
-    if (!known.has(a) || !known.has(b)) continue;
-    switch (r.relationship_type) {
-      case "parent": // a is a parent of b
-        ensure(childMap, a).add(b);
-        ensure(parentMap, b).add(a);
-        break;
-      case "child": // a is a child of b
-        ensure(parentMap, a).add(b);
-        ensure(childMap, b).add(a);
-        break;
-      case "sibling":
-        ensure(siblingMap, a).add(b);
-        ensure(siblingMap, b).add(a);
-        break;
-      case "spouse":
-        ensure(spouseMap, a).add(b);
-        ensure(spouseMap, b).add(a);
-        break;
-    }
-  }
-
-  for (const m of members) {
-    const parents = parentMap.get(m.id)!;
-    if (parents.size === 1) {
-      const [only] = parents;
-      for (const spouseId of spouseMap.get(only) ?? []) {
-        if (!parents.has(spouseId)) {
-          parents.add(spouseId);
-          ensure(childMap, spouseId).add(m.id);
-        }
-      }
-    }
-  }
-
-  return members.map((m): FTNode => ({
-    id: String(m.id),
-    gender: (m.gender === "female" ? "female" : "male") as unknown as G,
-    parents: [...parentMap.get(m.id)!].map((id) => ({ id: String(id), type: blood })),
-    children: [...childMap.get(m.id)!].map((id) => ({ id: String(id), type: blood })),
-    siblings: [...siblingMap.get(m.id)!].map((id) => ({ id: String(id), type: blood })),
-    spouses: [...spouseMap.get(m.id)!].map((id) => ({ id: String(id), type: married })),
-  }));
-}
 
 /** Members reachable from `startId` through any relationship (what the tree library can draw). */
 function findConnectedIds(members: FamilyMember[], rels: FamilyRelationship[], startId: number): Set<number> {
@@ -133,7 +61,7 @@ const AVATAR_TONE: Record<string, string> = {
 };
 const toneKey = (m: FamilyMember) => (m.gender === "female" || m.gender === "other" ? m.gender : "male");
 
-function MemberCardBody({ member }: { member: FamilyMember }) {
+function MemberCardBody({ member, divorced = false }: { member: FamilyMember; divorced?: boolean }) {
   const photo = imageSrc(member.photo_path);
   const label = dateLabel(member);
   return (
@@ -146,14 +74,17 @@ function MemberCardBody({ member }: { member: FamilyMember }) {
         </div>
       )}
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-gray-900">{formatFamilyName(member)}</p>
-        {label && <p className="truncate text-xs" style={{ color: "var(--color-text-secondary)" }}>{label}</p>}
+        <p className="break-words text-sm font-semibold leading-tight text-gray-900">{formatFamilyName(member)}</p>
+        {label && <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{label}</p>}
+        {divorced && <p className="text-xs italic" style={{ color: "var(--color-text-muted)" }}>Divorced</p>}
       </div>
     </div>
   );
 }
 
 function NodeCard({ node, member, isRoot, onSetRoot }: { node: ExtNode; member: FamilyMember; isRoot: boolean; onSetRoot: (id: number) => void }) {
+  // Marked "divorced" only when every marriage this person has is an ended one.
+  const divorced = node.spouses.length > 0 && node.spouses.every((sp) => String(sp.type) === "divorced");
   return (
     <div
       style={{
@@ -162,17 +93,18 @@ function NodeCard({ node, member, isRoot, onSetRoot }: { node: ExtNode; member: 
         top: node.top * HALF_H,
         width: NODE_W,
         height: NODE_H,
-        padding: 4,
-        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       <div
-        className={`flex h-full w-full cursor-pointer flex-col justify-center rounded-lg border-2 px-3 py-2 shadow-sm transition-all hover:shadow-md ${CARD_TONE[toneKey(member)]} ${isRoot ? "ring-2 ring-offset-1" : ""}`}
-        style={isRoot ? ({ "--tw-ring-color": "var(--color-accent)" } as React.CSSProperties) : undefined}
+        style={{ width: CARD_W, height: CARD_H, ...(isRoot ? ({ "--tw-ring-color": "var(--color-accent)" } as React.CSSProperties) : null) }}
+        className={`flex cursor-pointer flex-col justify-center rounded-lg border-2 px-3 py-2 shadow-sm transition-all hover:shadow-md ${CARD_TONE[toneKey(member)]} ${divorced ? "border-dashed" : ""} ${isRoot ? "ring-2 ring-offset-1" : ""}`}
         onClick={() => onSetRoot(member.id)}
         title="Click to center tree on this person"
       >
-        <MemberCardBody member={member} />
+        <MemberCardBody member={member} divorced={divorced} />
       </div>
     </div>
   );
@@ -220,6 +152,7 @@ export default function FamilyTreeChart({ members, rels, initialRootId }: Family
       <div className="overflow-x-auto">
         <div style={{ position: "relative", display: "inline-block", minWidth: "100%" }}>
           <ReactFamilyTree
+            className="[&>i]:!bg-[var(--color-text-muted)] [&>i]:shadow-[0_0_0_0.5px_var(--color-text-muted)]"
             nodes={nodes}
             rootId={String(effectiveRoot)}
             width={NODE_W}
