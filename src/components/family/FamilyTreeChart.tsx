@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import ReactFamilyTree from "react-family-tree";
+import calcTree from "relatives-tree";
 import type { ExtNode } from "relatives-tree/lib/types";
 import { imageSrc } from "@/lib/image-src";
 import { formatFamilyName } from "@/lib/reader-utils";
+import { describeRelationship } from "@/lib/data/family";
 import { buildNodes } from "@/lib/family-nodes";
 import type { FamilyMember, FamilyRelationship } from "@/lib/models";
 
@@ -16,22 +18,24 @@ const CARD_H = 92;
 const HALF_W = NODE_W / 2;
 const HALF_H = NODE_H / 2;
 
-/** Members reachable from `startId` through any relationship (what the tree library can draw). */
-function findConnectedIds(members: FamilyMember[], rels: FamilyRelationship[], startId: number): Set<number> {
-  const adj = new Map<number, Set<number>>(members.map((m) => [m.id, new Set<number>()]));
-  for (const r of rels) {
-    adj.get(r.from_member_id)?.add(r.to_member_id);
-    adj.get(r.to_member_id)?.add(r.from_member_id);
-  }
-  const seen = new Set<number>();
-  const stack = [startId];
-  while (stack.length) {
-    const id = stack.pop()!;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    for (const n of adj.get(id) ?? []) if (!seen.has(n)) stack.push(n);
-  }
-  return seen;
+/**
+ * The chart draws one person's own family: ancestors, descendants, siblings and spouses. Everyone else
+ * (a spouse's parents, aunts, cousins, people with no relationships yet) is listed under the chart so
+ * nobody is ever hidden. `hint` says how they're related to someone, e.g. "Parent of Esther Krynsky".
+ */
+function membersNotDrawn(members: FamilyMember[], rels: FamilyRelationship[], nodes: ReturnType<typeof buildNodes>, rootId: number) {
+  const drawn = new Set(calcTree(nodes as never, { rootId: String(rootId) }).nodes.map((n) => Number(n.id)));
+  const byId = new Map(members.map((m) => [m.id, m]));
+  return members
+    .filter((m) => !drawn.has(m.id))
+    .map((m) => {
+      const lines = rels.map((r) => describeRelationship(r, m.id)).filter((d): d is NonNullable<typeof d> => !!d && byId.has(d.otherId));
+      // Prefer a relationship to someone who is drawn (it tells you where they belong).
+      const best = lines.find((d) => drawn.has(d.otherId)) ?? lines[0];
+      const phrase = best ? best.phrase.replace(/^is /, "").replace(/^a /, "") : "";
+      const hint = best ? `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} ${formatFamilyName(byId.get(best.otherId)!)}` : null;
+      return { member: m, hint };
+    });
 }
 
 function yearOf(date: string | null): string | null {
@@ -129,8 +133,7 @@ export default function FamilyTreeChart({ members, rels, initialRootId }: Family
   const effectiveRoot = memberMap.has(rootId) ? rootId : (members[0]?.id ?? 0);
   if (members.length === 0) return null;
 
-  const connected = findConnectedIds(members, rels, effectiveRoot);
-  const unconnected = members.filter((m) => !connected.has(m.id));
+  const notDrawn = membersNotDrawn(members, rels, nodes, effectiveRoot);
 
   return (
     <div className="space-y-3">
@@ -168,13 +171,16 @@ export default function FamilyTreeChart({ members, rels, initialRootId }: Family
         </div>
       </div>
 
-      {unconnected.length > 0 && (
+      {notDrawn.length > 0 && (
         <div className="mt-4">
-          <h3 className="mb-3 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
-            Not yet connected to tree
+          <h3 className="mb-1 text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
+            Also in your family
           </h3>
+          <p className="mb-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Not part of {formatFamilyName(memberMap.get(effectiveRoot)!)}'s own line. Click a card to center the tree on them.
+          </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {unconnected.map((m) => (
+            {notDrawn.map(({ member: m, hint }) => (
               <div
                 key={m.id}
                 className={`cursor-pointer rounded-lg border-2 px-3 py-2 shadow-sm transition-all hover:shadow-md ${CARD_TONE[toneKey(m)]}`}
@@ -182,6 +188,7 @@ export default function FamilyTreeChart({ members, rels, initialRootId }: Family
                 title="Click to center tree on this person"
               >
                 <MemberCardBody member={m} />
+                <p className="mt-1 text-xs italic" style={{ color: "var(--color-text-muted)" }}>{hint ?? "Not connected to anyone yet"}</p>
               </div>
             ))}
           </div>

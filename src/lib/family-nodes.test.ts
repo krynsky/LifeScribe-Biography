@@ -27,3 +27,18 @@ describe("buildNodes", () => {
     expect(ids([...nodes.find((n) => n.id === "3")!.parents]).sort()).toEqual([1, 4]);
   });
 });
+
+describe("buildNodes couples", () => {
+  it("treats two parents of the same child as a couple even with no marriage recorded", () => {
+    const members = [m(1), m(2, null, "female"), m(3)];
+    const nodes = buildNodes(members, [rel(1, 1, 3, "parent"), rel(2, 2, 3, "parent")]);
+    expect(nodes.find((n) => n.id === "1")!.spouses.map((s) => s.id)).toEqual(["2"]);
+    expect(nodes.find((n) => n.id === "2")!.spouses.map((s) => s.id)).toEqual(["1"]);
+  });
+
+  it("keeps a recorded ended marriage ended", () => {
+    const members = [m(1), m(2, null, "female"), m(3)];
+    const nodes = buildNodes(members, [rel(1, 1, 3, "parent"), rel(2, 2, 3, "parent"), rel(3, 1, 2, "spouse", 1)]);
+    expect(nodes.find((n) => n.id === "1")!.spouses.map((s) => String(s.type))).toEqual(["divorced"]);
+  });
+});

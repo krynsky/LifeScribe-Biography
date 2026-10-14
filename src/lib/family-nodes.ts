@@ -62,6 +62,21 @@ export function buildNodes(members: FamilyMember[], rels: FamilyRelationship[]):
     }
   }
 
+  // Two people who are both a parent of the same child are a couple, even if nobody recorded a marriage,
+  // so they are drawn side by side (and a parent shows up when centering on their partner).
+  for (const m of members) {
+    const parents = [...parentMap.get(m.id)!];
+    for (let i = 0; i < parents.length; i++) {
+      for (let j = i + 1; j < parents.length; j++) {
+        const a = ensureSpouses(parents[i]);
+        if (!a.has(parents[j])) {
+          a.set(parents[j], false);
+          ensureSpouses(parents[j]).set(parents[i], false);
+        }
+      }
+    }
+  }
+
   for (const m of members) {
     const parents = parentMap.get(m.id)!;
     if (parents.size === 1) {
