@@ -136,3 +136,23 @@ describe("0011_drop_sync_tables", () => {
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name IN ('sync_state','sync_deletions')").all()).toEqual([]);
   });
 });
+
+describe("0012_drop_web_cover_fields", () => {
+  it("turns an album's web cover URL into a chosen cover before dropping the columns", () => {
+    const db = new Database(":memory:");
+    migrate(db, 11);
+    db.exec(`
+      INSERT INTO albums (id, name, cover_image) VALUES (1, 'Trip', 'https://x/b.jpg'), (2, 'Plain', NULL);
+      INSERT INTO media (id, file_path, filename, album_id, sort_order, remote_url) VALUES
+        (1, '/a.jpg', 'a.jpg', 1, 1, NULL), (2, '/b.jpg', 'b.jpg', 1, 2, 'https://x/b.jpg');
+    `);
+    migrate(db);
+    expect(db.prepare("SELECT id, cover_media_id FROM albums ORDER BY id").all()).toEqual([
+      { id: 1, cover_media_id: 2 },
+      { id: 2, cover_media_id: null },
+    ]);
+    const cols = (t: string) => (db.prepare(`PRAGMA table_info(${t})`).all() as { name: string }[]).map((c) => c.name);
+    expect(cols("albums")).not.toContain("cover_image");
+    expect(cols("media")).not.toContain("remote_url");
+  });
+});

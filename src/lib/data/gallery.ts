@@ -31,13 +31,9 @@ export async function listAlbumsWithCovers(r: SqlRunner): Promise<AlbumListItem[
       cover = chosen[0] ? (chosen[0].thumbnail_path ?? chosen[0].file_path) : null;
     }
     if (!cover) {
-      const coverImage = a.cover_image ?? null;
       const rows = await r.select<{ thumbnail_path: string }>(
-        `SELECT thumbnail_path FROM media
-          WHERE album_id = ? AND thumbnail_path IS NOT NULL
-          ORDER BY CASE WHEN ? IS NOT NULL AND remote_url = ? THEN 0 ELSE 1 END, sort_order, id
-          LIMIT 1`,
-        [a.id, coverImage, coverImage]
+        `SELECT thumbnail_path FROM media WHERE album_id = ? AND thumbnail_path IS NOT NULL ORDER BY sort_order, id LIMIT 1`,
+        [a.id]
       );
       cover = rows[0]?.thumbnail_path ?? null;
     }
@@ -53,7 +49,7 @@ export async function setAlbumCover(r: SqlRunner, albumId: number, mediaId: numb
     if (rows.length === 0) throw new Error("That photo isn't in this album.");
   }
   // Clearing the explicit choice also clears any synced cover URL so the new choice wins.
-  await r.execute("UPDATE albums SET cover_media_id = ?, cover_image = NULL, updated_at = datetime('now') WHERE id = ?", [mediaId, albumId]);
+  await r.execute("UPDATE albums SET cover_media_id = ?, updated_at = datetime('now') WHERE id = ?", [mediaId, albumId]);
 }
 
 /** Remove one photo/video. If it was an album's cover, that album falls back to its first photo. */

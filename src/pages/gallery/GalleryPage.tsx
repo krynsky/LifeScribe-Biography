@@ -60,7 +60,7 @@ export default function GalleryPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {albums.map((album) => {
-            const cover = imageSrc(album.cover_path) ?? imageSrc(album.cover_image);
+            const cover = imageSrc(album.cover_path);
             return (
               <div key={album.id} className="group relative rounded-xl overflow-hidden border hover:shadow-md transition-shadow" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
                 <Link to="/gallery/albums/$albumId" params={{ albumId: String(album.id) }} className="block">

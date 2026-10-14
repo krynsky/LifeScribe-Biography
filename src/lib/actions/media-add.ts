@@ -88,14 +88,14 @@ export async function addMediaByUrl(input: { url: string; caption?: string; albu
 
   switch (plan.kind) {
     case "youtube":
-      return insertMedia({ ...base, file_path: plan.thumbnailUrl, thumbnail_path: plan.thumbnailUrl, mime_type: "video/mp4", source_url: plan.url, remote_url: plan.thumbnailUrl });
+      return insertMedia({ ...base, file_path: plan.thumbnailUrl, thumbnail_path: plan.thumbnailUrl, mime_type: "video/mp4", source_url: plan.url });
     case "vimeo": {
       const thumb = await vimeoThumbnail(plan.oembedUrl);
-      return insertMedia({ ...base, file_path: thumb ?? plan.url, thumbnail_path: thumb ?? undefined, mime_type: "video/mp4", source_url: plan.url, remote_url: thumb ?? undefined });
+      return insertMedia({ ...base, file_path: thumb ?? plan.url, thumbnail_path: thumb ?? undefined, mime_type: "video/mp4", source_url: plan.url });
     }
     case "video-file":
       return insertMedia({ ...base, file_path: plan.url, mime_type: "video/mp4", source_url: plan.url });
     case "image":
-      return insertMedia({ ...base, file_path: plan.url, thumbnail_path: plan.url, mime_type: imageMimeType(plan.filename), remote_url: plan.url });
+      return insertMedia({ ...base, file_path: plan.url, thumbnail_path: plan.url, mime_type: imageMimeType(plan.filename) });
   }
 }

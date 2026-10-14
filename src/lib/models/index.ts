@@ -28,14 +28,13 @@ export interface Story {
   event_date: string | null;
   event_date_precision: "year" | "month" | "day";
   featured_image_path: string | null;
-  // Web-owned display fields mirrored by sync
+  // Display fields joined in from the shared categories/tags tables
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
   category_id?: number | null;
   tags?: string | null; // JSON array of tag names
   author_name?: string | null;
-  related?: string | null; // JSON {milestones, albums, map_pins, career}
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -50,13 +49,12 @@ export interface Milestone {
   category: string | null;
   color: string;
   image_path: string | null;
-  // Web-owned display fields mirrored by sync (category is the column above)
+  // Display fields joined in from the shared categories/tags tables
   category_color?: string | null;
   category_icon?: string | null;
   category_id?: number | null;
   end_date?: string | null;
   end_date_precision?: string | null;
-  linked_stories?: string | null; // JSON [{remote_id,title}]
   position?: number | null;
   created_at: string;
   updated_at: string;
@@ -67,10 +65,9 @@ export interface Album {
   name: string;
   description: string | null;
   cover_media_id: number | null;
-  cover_image: string | null; // explicit cover URL synced from the web (matches a media remote_url)
   date_from: string | null;
   date_to: string | null;
-  // Web-owned display fields mirrored by sync
+  // Display fields joined in from the shared categories/tags tables
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
@@ -105,7 +102,6 @@ export interface Media {
   import_source: string | null;
   import_hash: string | null;
   source_url: string | null; // video media: external embed URL (e.g. YouTube)
-  remote_url: string | null; // the web-side URL this media was synced from (for cover matching)
   created_at: string;
   updated_at: string;
 }
@@ -147,9 +143,7 @@ export interface CareerEntry {
   location: string | null;
   logo_path: string | null;
   employment_type?: string | null;
-  linked_albums?: string | null; // JSON [{remote_id,title}]
-  linked_stories?: string | null; // JSON [{remote_id,title}]
-  // Web-owned display fields mirrored by sync
+  // Display fields joined in from the shared categories/tags tables
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;
@@ -169,10 +163,8 @@ export interface MapPin {
   pin_type: "place" | "home" | "work" | "travel" | "memory";
   color: string;
   image_path?: string | null;
-  linked_albums?: string | null; // JSON [{remote_id,title}]
-  linked_stories?: string | null; // JSON [{remote_id,title}]
   position?: number | null;
-  // Web-owned display fields mirrored by sync
+  // Display fields joined in from the shared categories/tags tables
   category?: string | null;
   category_color?: string | null;
   category_icon?: string | null;

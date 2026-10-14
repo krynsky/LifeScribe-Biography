@@ -20,7 +20,7 @@ async function albumCovers(): Promise<Map<number, string>> {
   const albums = await listAlbums();
   const out = new Map<number, string>();
   for (const a of albums) {
-    const cover = a.cover_path ?? a.cover_image;
+    const cover = a.cover_path;
     if (cover) out.set(a.id, cover);
   }
   return out;

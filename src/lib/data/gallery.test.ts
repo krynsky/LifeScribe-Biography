@@ -8,10 +8,10 @@ function seed() {
   const t = createTestDb();
   t.db.exec(`
     INSERT INTO albums (id, name) VALUES (1, 'Trip'), (2, 'Empty');
-    INSERT INTO media (id, file_path, thumbnail_path, filename, mime_type, album_id, sort_order, remote_url)
-      VALUES (1, '/a.jpg', '/t1.jpg', 'a.jpg', 'image/jpeg', 1, 1, NULL),
-             (2, '/b.jpg', '/t2.jpg', 'b.jpg', 'image/jpeg', 1, 2, 'https://x/b.jpg'),
-             (3, '/c.jpg', '/t3.jpg', 'c.jpg', 'image/jpeg', 1, 3, NULL);
+    INSERT INTO media (id, file_path, thumbnail_path, filename, mime_type, album_id, sort_order)
+      VALUES (1, '/a.jpg', '/t1.jpg', 'a.jpg', 'image/jpeg', 1, 1),
+             (2, '/b.jpg', '/t2.jpg', 'b.jpg', 'image/jpeg', 1, 2),
+             (3, '/c.jpg', '/t3.jpg', 'c.jpg', 'image/jpeg', 1, 3);
     INSERT INTO stories (id, title) VALUES (1, 'S');
   `);
   return t;
@@ -27,10 +27,8 @@ describe("listAlbumsWithCovers", () => {
     expect(albums.find((a) => a.id === 2)).toMatchObject({ media_count: 0, cover_path: null });
   });
 
-  it("prefers the synced cover URL, then an explicitly chosen cover", async () => {
-    const { db, runner } = seed();
-    db.exec("UPDATE albums SET cover_image = 'https://x/b.jpg' WHERE id = 1");
-    expect((await listAlbumsWithCovers(runner)).find((a) => a.id === 1)!.cover_path).toBe("/t2.jpg");
+  it("prefers an explicitly chosen cover", async () => {
+    const { runner } = seed();
     await setAlbumCover(runner, 1, 3);
     expect((await listAlbumsWithCovers(runner)).find((a) => a.id === 1)!.cover_path).toBe("/t3.jpg");
   });

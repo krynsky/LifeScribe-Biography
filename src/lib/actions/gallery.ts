@@ -114,15 +114,13 @@ export async function insertMedia(data: {
   import_hash?: string;
   /** Video media: the embed URL played in the lightbox (YouTube, Vimeo…). */
   source_url?: string;
-  /** The web URL this media came from, when added by link. */
-  remote_url?: string;
 }): Promise<Media> {
   const result = await execute(
     `INSERT OR IGNORE INTO media
       (file_path, thumbnail_path, filename, title, caption, width, height,
        file_size, mime_type, taken_at, camera_make, camera_model,
-       latitude, longitude, album_id, import_source, import_hash, source_url, remote_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       latitude, longitude, album_id, import_source, import_hash, source_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       data.file_path,
       data.thumbnail_path ?? null,
@@ -142,7 +140,6 @@ export async function insertMedia(data: {
       data.import_source ?? null,
       data.import_hash ?? null,
       data.source_url ?? null,
-      data.remote_url ?? null,
     ]
   );
   if (result.rowsAffected > 0 && data.album_id) {

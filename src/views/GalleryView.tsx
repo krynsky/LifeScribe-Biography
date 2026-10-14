@@ -42,7 +42,7 @@ export default function GalleryView() {
             {albums.map((album) => {
               // Web uses the album's explicit cover image; locally that is the downloaded photo
               // matching it (cover_path), else the remote cover URL.
-              const cover = imageSrc(album.cover_path) ?? imageSrc(album.cover_image);
+              const cover = imageSrc(album.cover_path);
               return (
                 <Link
                   key={album.id}

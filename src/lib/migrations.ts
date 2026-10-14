@@ -643,4 +643,16 @@ DROP TABLE IF EXISTS sync_state;
 DROP TABLE IF EXISTS uploaded_images
 `,
   ],
+  // Two leftovers from website sync: an album's web cover URL (matched to a photo's web URL) and the
+  // photo's web URL itself. Keep the cover the user was seeing by turning the match into a chosen cover.
+  [
+    "0012_drop_web_cover_fields",
+    `
+UPDATE albums SET cover_media_id = (
+  SELECT m.id FROM media m WHERE m.album_id = albums.id AND m.remote_url = albums.cover_image ORDER BY m.sort_order, m.id LIMIT 1
+) WHERE cover_media_id IS NULL AND cover_image IS NOT NULL;
+ALTER TABLE albums DROP COLUMN cover_image;
+ALTER TABLE media DROP COLUMN remote_url
+`,
+  ],
 ];
