@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { CheckCircle, ExternalLink } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { getApiKey, saveApiKey } from "@/lib/ai-curator";
@@ -44,8 +45,11 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
+  const [version, setVersion] = useState("");
+
   useEffect(() => {
     setApiKey(getApiKey());
+    getVersion().then(setVersion).catch(() => {});
   }, []);
 
   function handleSaveApiKey(e: React.FormEvent) {
@@ -155,7 +159,7 @@ export default function SettingsPage() {
           <dl className="space-y-1.5 text-sm">
             <div className="flex justify-between">
               <dt style={{ color: "var(--color-text-secondary)" }}>Version</dt>
-              <dd style={{ color: "var(--color-text)" }}>0.1.0</dd>
+              <dd style={{ color: "var(--color-text)" }}>{version}</dd>
             </div>
             <div className="flex justify-between">
               <dt style={{ color: "var(--color-text-secondary)" }}>Data location</dt>
