@@ -1,17 +1,9 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, Loader2, RefreshCw, LogOut, ExternalLink } from "lucide-react";
+import { CheckCircle, ExternalLink } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { getApiKey, saveApiKey } from "@/lib/ai-curator";
-import {
-  getSyncToken, getSyncUrl, saveSyncCredentials, clearSyncCredentials,
-  isSyncConfigured, getSyncMode, setSyncMode,
-  makeSyncService, type SyncMode, type ConflictItem,
-} from "@/lib/sync";
-import { testConnection, type RemoteProfile } from "@/lib/sync/web-profile";
 import { copyReferencedPhotosIntoLibrary } from "@/lib/actions/library";
 import { createBackup } from "@/lib/backup";
-import PublishReviewModal from "@/components/sync/PublishReviewModal";
-import ConflictsModal from "@/components/sync/ConflictsModal";
 
 export default function SettingsPage() {
   // Photo library migration
@@ -31,38 +23,29 @@ export default function SettingsPage() {
     }
   }
 
+  // Database backup
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+
+  async function handleBackup() {
+    setBackupBusy(true);
+    setBackupStatus("Backing up…");
+    try {
+      const path = await createBackup("manual");
+      setBackupStatus(`Backup saved to ${path}`);
+    } catch (err) {
+      setBackupStatus("Backup failed: " + String(err));
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
   // Claude API key
   const [apiKey, setApiKey] = useState("");
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
-  // Sync settings
-  const [syncToken, setSyncToken] = useState("");
-  const [syncUrl, setSyncUrl] = useState("");
-  const [syncProfile, setSyncProfile] = useState<RemoteProfile | null>(null);
-  const [syncConnecting, setSyncConnecting] = useState(false);
-  const [syncError, setSyncError] = useState("");
-  const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("");
-  const [syncResult, setSyncResult] = useState<{ pushed: number; pulled: number; conflicts: string[] } | null>(null);
-  const [mode, setMode] = useState<SyncMode>(getSyncMode());
-  const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
-  const [unpublished, setUnpublished] = useState<Array<{ entity_type: string; local_id: number }>>([]);
-  const [showPublish, setShowPublish] = useState(false);
-  const [showConflicts, setShowConflicts] = useState(false);
-  const [deletionCount, setDeletionCount] = useState(0);
-
   useEffect(() => {
     setApiKey(getApiKey());
-    setSyncToken(getSyncToken());
-    setSyncUrl(getSyncUrl());
-    if (isSyncConfigured()) {
-      testConnection()
-        .then(setSyncProfile)
-        .catch(() => setSyncProfile(null));
-      const svc = makeSyncService();
-      svc.listUnpublished().then(setUnpublished).catch(() => {});
-      svc.listDeletions().then((d) => setDeletionCount(d.length)).catch(() => {});
-    }
   }, []);
 
   function handleSaveApiKey(e: React.FormEvent) {
@@ -72,97 +55,9 @@ export default function SettingsPage() {
     setTimeout(() => setApiKeySaved(false), 2000);
   }
 
-  async function handleConnect(e: React.FormEvent) {
-    e.preventDefault();
-    if (!syncToken.trim()) return;
-    setSyncConnecting(true);
-    setSyncError("");
-    saveSyncCredentials(syncToken.trim(), syncUrl.trim() || undefined);
-    try {
-      const profile = await testConnection();
-      setSyncProfile(profile);
-    } catch (err) {
-      setSyncError(String(err));
-      clearSyncCredentials();
-    } finally {
-      setSyncConnecting(false);
-    }
-  }
-
-  function handleDisconnect() {
-    clearSyncCredentials();
-    setSyncProfile(null);
-    setSyncToken("");
-    setSyncError("");
-  }
-
-  function handleModeChange(m: SyncMode) {
-    setSyncMode(m);
-    setMode(m);
-  }
-
-  async function handleRefresh() {
-    setSyncing(true);
-    setSyncResult(null);
-    setSyncStatus("");
-    try {
-      const svc = makeSyncService();
-      setSyncStatus("Backing up your data…");
-      await createBackup("before-refresh").catch((e) => console.error("Backup before refresh failed:", e));
-      const summary = await svc.refresh((msg) => setSyncStatus(msg));
-      setConflicts(summary.conflicts);
-      setUnpublished(await svc.listUnpublished());
-      setDeletionCount((await svc.listDeletions()).length);
-      setSyncResult({ pushed: 0, pulled: summary.created + summary.updated, conflicts: summary.conflicts.map((c) => `${c.entity_type}:${c.remote_id}`) });
-      setSyncStatus(`Refreshed — ${summary.created} new, ${summary.updated} updated, ${summary.deleted} removed, ${summary.conflicts.length} conflicts${summary.keptDeleted ? ` · ${summary.keptDeleted} you deleted are waiting in Review & publish` : ""}`);
-    } catch (err) {
-      setSyncStatus("Refresh failed: " + String(err));
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  async function handleResetRefresh() {
-    setSyncing(true);
-    setSyncStatus("");
-    try {
-      const svc = makeSyncService();
-      setSyncStatus("Backing up your data…");
-      await createBackup("before-reset");
-      const summary = await svc.reset((msg) => setSyncStatus(msg));
-      setSyncStatus(`Reset complete — ${summary.created + summary.updated} records refreshed from web`);
-      setUnpublished(await svc.listUnpublished());
-    } catch (err) {
-      setSyncStatus("Reset failed: " + String(err));
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  async function refreshUnpublished() {
-    try {
-      const svc = makeSyncService();
-      setUnpublished(await svc.listUnpublished());
-      setDeletionCount((await svc.listDeletions()).length);
-    } catch {
-      /* the count is informational */
-    }
-  }
-
   return (
     <div className="p-8 max-w-2xl">
       <PageHeader title="Settings" />
-
-      <ConflictsModal
-        open={showConflicts}
-        conflicts={conflicts}
-        onClose={() => setShowConflicts(false)}
-        onChanged={(remaining) => {
-          setConflicts(remaining);
-          void refreshUnpublished();
-        }}
-      />
-      <PublishReviewModal open={showPublish} onClose={() => setShowPublish(false)} onFinished={() => void refreshUnpublished()} />
 
       <div className="space-y-6">
         {/* Claude API Key */}
@@ -208,154 +103,25 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* LifeScribe.us Sync */}
+        {/* Backup */}
         <div className="p-6 rounded-xl border" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
           <h2 className="text-base font-semibold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
-            Sync to LifeScribe.us
+            Back up your data
           </h2>
           <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
-            Optionally publish your biography to the web by connecting your LifeScribe.us account.
-            Your data stays local — sync is opt-in only.
+            Save a snapshot of your whole biography (stories, timeline, family tree, everything except the image files).
+            The newest 10 backups are kept in the app's data folder. To keep a copy somewhere else, also copy that folder and the images folder next to it.
           </p>
-
-          {syncProfile ? (
-            /* Connected */
-            <div className="space-y-4">
-              <div
-                className="flex items-center gap-3 p-3 rounded-lg"
-                style={{ background: "var(--color-primary)" + "10", borderColor: "var(--color-primary)" + "40" }}
-              >
-                <CheckCircle size={16} style={{ color: "var(--color-primary)" }} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-                    Connected as {syncProfile.display_name}
-                  </div>
-                  <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>{syncProfile.email}</div>
-                  <a
-                    href={`https://lifescribe.us/${syncProfile.site.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs mt-0.5"
-                    style={{ color: "var(--color-primary)" }}
-                  >
-                    {syncProfile.site.title} <ExternalLink size={10} />
-                  </a>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Source of truth</label>
-                  <select
-                    value={mode}
-                    onChange={(e) => handleModeChange(e.target.value as SyncMode)}
-                    className="px-3 py-2 rounded-lg border text-sm"
-                    style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                  >
-                    <option value="web-master">Web is master</option>
-                    <option value="app-master">App is master</option>
-                    <option value="standalone">Standalone (no sync)</option>
-                  </select>
-                </div>
-
-                {mode !== "standalone" && (
-                  <div className="flex gap-2 flex-wrap">
-                    <button onClick={handleRefresh} disabled={syncing}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-60"
-                      style={{ background: "var(--color-primary)" }}>
-                      {syncing ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-                      {syncing ? "Working…" : "Refresh from web"}
-                    </button>
-                    <button onClick={() => setShowPublish(true)} disabled={syncing}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm border font-medium disabled:opacity-50"
-                      style={{ borderColor: "var(--color-primary)", color: "var(--color-primary)" }}
-                      title="Review and send your new and changed items to your website">
-                      Review &amp; publish{unpublished.length + deletionCount ? ` (${unpublished.length + deletionCount})` : ""}
-                    </button>
-                    <button onClick={handleResetRefresh} disabled={syncing}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border disabled:opacity-60"
-                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
-                      title="Discard local copies of web content and re-pull everything fresh">
-                      Reset &amp; re-pull
-                    </button>
-                    <button onClick={handleDisconnect}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm border"
-                      style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
-                      <LogOut size={13} /> Disconnect
-                    </button>
-                  </div>
-                )}
-
-                {conflicts.length > 0 && (
-                  <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "#F59E0B" }}>
-                    <div className="font-medium mb-1" style={{ color: "var(--color-text)" }}>
-                      {conflicts.length} item{conflicts.length === 1 ? " was" : "s were"} edited in the app and on the website
-                    </div>
-                    <div className="mb-2" style={{ color: "var(--color-text-muted)" }}>
-                      Nothing was overwritten. Compare the two versions and choose which to keep.
-                    </div>
-                    <button onClick={() => setShowConflicts(true)} className="px-3 py-1.5 rounded-lg text-sm text-white" style={{ background: "var(--color-primary)" }}>
-                      Compare &amp; resolve
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {syncStatus && (
-                <div className="text-xs flex items-center gap-2" style={{ color: syncResult ? "var(--color-primary)" : "var(--color-text-muted)" }}>
-                  {syncing && <Loader2 size={11} className="animate-spin" />}
-                  {syncResult && !syncing && <CheckCircle size={11} />}
-                  {syncStatus}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Not connected */
-            <form onSubmit={handleConnect} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text)" }}>
-                  Personal Access Token
-                </label>
-                <input
-                  type="password"
-                  value={syncToken}
-                  onChange={(e) => setSyncToken(e.target.value)}
-                  placeholder="ls_pat_…"
-                  className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
-                  style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                />
-                <div className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                  Generate a token at lifescribe.us → Account → API Tokens
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text)" }}>
-                  API URL <span style={{ color: "var(--color-text-muted)" }}>(optional)</span>
-                </label>
-                <input
-                  type="url"
-                  value={syncUrl}
-                  onChange={(e) => setSyncUrl(e.target.value)}
-                  placeholder="https://lifescribe.us/api/v1"
-                  className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
-                  style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-                />
-              </div>
-              {syncError && (
-                <div className="text-xs p-2 rounded-lg" style={{ background: "var(--color-error)" + "18", color: "var(--color-error)" }}>
-                  {syncError}
-                </div>
-              )}
-              <button
-                type="submit"
-                disabled={syncConnecting || !syncToken.trim()}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-50"
-                style={{ background: "var(--color-primary)" }}
-              >
-                {syncConnecting && <Loader2 size={13} className="animate-spin" />}
-                {syncConnecting ? "Connecting…" : "Connect Account"}
-              </button>
-            </form>
+          <button
+            onClick={handleBackup}
+            disabled={backupBusy}
+            className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-50"
+            style={{ background: "var(--color-primary)" }}
+          >
+            Back up now
+          </button>
+          {backupStatus && (
+            <p className="text-sm mt-3 break-all" style={{ color: "var(--color-text-secondary)" }}>{backupStatus}</p>
           )}
         </div>
 

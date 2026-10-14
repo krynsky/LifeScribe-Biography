@@ -626,5 +626,21 @@ BEGIN
 END;
 `,
   ],
+  // The app no longer syncs with a website: drop the sync bookkeeping, deletion tombstones (and the
+  // triggers that wrote them) and the upload cache. Nothing else referenced them.
+  [
+    "0011_drop_sync_tables",
+    `
+DROP TRIGGER IF EXISTS trg_tombstone_story;
+DROP TRIGGER IF EXISTS trg_tombstone_milestone;
+DROP TRIGGER IF EXISTS trg_tombstone_career;
+DROP TRIGGER IF EXISTS trg_tombstone_map_pin;
+DROP TRIGGER IF EXISTS trg_tombstone_family_member;
+DROP TRIGGER IF EXISTS trg_tombstone_album;
+DROP TRIGGER IF EXISTS trg_tombstone_media;
+DROP TABLE IF EXISTS sync_deletions;
+DROP TABLE IF EXISTS sync_state;
+DROP TABLE IF EXISTS uploaded_images
+`,
+  ],
 ];
-

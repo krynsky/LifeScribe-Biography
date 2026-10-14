@@ -21,7 +21,7 @@ describe("migrations", () => {
     const db = new Database(":memory:");
     migrate(db);
     const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((t) => t.name);
-    for (const t of ["stories", "milestones", "career_entries", "map_pins", "family_members", "albums", "media", "sync_state", "categories", "tags"]) {
+    for (const t of ["stories", "milestones", "career_entries", "map_pins", "family_members", "albums", "media", "categories", "tags"]) {
       expect(tables).toContain(t);
     }
   });
@@ -30,7 +30,7 @@ describe("migrations", () => {
 describe("0009_uploaded_images", () => {
   it("creates the upload cache keyed by content hash", () => {
     const db = new Database(":memory:");
-    migrate(db);
+    migrate(db, 9);
     db.prepare("INSERT INTO uploaded_images (content_hash, url) VALUES (?, ?)").run("abc", "https://x/a.jpg");
     expect(() => db.prepare("INSERT INTO uploaded_images (content_hash, url) VALUES (?, ?)").run("abc", "https://x/b.jpg")).toThrow();
     expect(db.prepare("SELECT url FROM uploaded_images WHERE content_hash = 'abc'").get()).toEqual({ url: "https://x/a.jpg" });
@@ -114,5 +114,25 @@ describe("0007_categories_tags_links backfill", () => {
         if (!isBenignMigrationError(stmt, e)) throw e;
       }
     }
+  });
+});
+
+describe("0011_drop_sync_tables", () => {
+  it("removes the sync tables and triggers, and deleting records still works", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    const names = (db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'sync_%' OR name LIKE 'trg_tombstone%' OR name = 'uploaded_images'").all() as { name: string }[]).map((r) => r.name);
+    expect(names).toEqual([]);
+    db.exec("INSERT INTO stories (id, title) VALUES (1, 'S'); INSERT INTO albums (id, name) VALUES (1, 'A')");
+    expect(() => db.exec("DELETE FROM stories WHERE id = 1; DELETE FROM albums WHERE id = 1")).not.toThrow();
+  });
+
+  it("upgrades a database that already has sync data", () => {
+    const db = new Database(":memory:");
+    migrate(db, 10);
+    db.exec("INSERT INTO stories (id, title) VALUES (1, 'S'); INSERT INTO sync_state (entity_type, local_id, remote_id) VALUES ('story', 1, 'st-1')");
+    db.exec("DELETE FROM stories WHERE id = 1");
+    migrate(db);
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name IN ('sync_state','sync_deletions')").all()).toEqual([]);
   });
 });

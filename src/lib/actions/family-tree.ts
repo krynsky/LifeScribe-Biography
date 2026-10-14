@@ -62,7 +62,7 @@ export async function listRelationships(memberId?: number): Promise<FamilyRelati
 /** Throws a readable Error for self-relationships and duplicates (in either direction). */
 export async function addRelationship(fromMemberId: number, toMemberId: number, type: family.RelationshipType): Promise<void> {
   await family.addRelationship(appRunner, fromMemberId, toMemberId, type);
-  // A relationship change is an edit to both people (so sync notices).
+  // A relationship change is an edit to both people.
   await execute("UPDATE family_members SET updated_at = datetime('now') WHERE id IN (?, ?)", [fromMemberId, toMemberId]);
 }
 

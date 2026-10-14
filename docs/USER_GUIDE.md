@@ -1,6 +1,6 @@
 # LifeScribe User Guide
 
-LifeScribe is a desktop app for writing and organizing your life story. Everything lives on your own computer — your stories, photos, timeline, family tree, career history, and places all stay in a local database, and the app works fully offline. If you have a lifescribe.us account, you can optionally sync your biography to the web when you're ready to share it.
+LifeScribe is a desktop app for writing and organizing your life story. Everything lives on your own computer — your stories, photos, timeline, family tree, career history, and places all stay in a local database, and the app works fully offline.
 
 ## Getting Started
 
@@ -8,7 +8,7 @@ LifeScribe is a desktop app for writing and organizing your life story. Everythi
 2. Use the sidebar on the left to move between sections.
 3. Start anywhere — write a story, add a milestone, or import your photos. There's no required order.
 
-Your data is stored locally on your machine. Nothing is uploaded anywhere unless you connect a lifescribe.us account in Settings and choose to publish.
+Your data is stored locally on your machine. Nothing is uploaded anywhere; the app has no online account.
 
 ## Sections of Your Biography
 
@@ -68,32 +68,23 @@ Nothing imported is added to your biography automatically. Every suggestion land
 
 ## Read and Edit modes
 
-The **Read | Edit** toggle at the top of the sidebar switches the whole app between editing and reading. In Read mode every section (Overview, Stories, Timeline, Gallery, Family Tree, Career, Maps) shows the same presentation visitors see on lifescribe.us, using the same sidebar. Switch back to Edit at any time and you land on the same section. You can also click **Read My Biography** on the Overview to switch to Read mode. Use it to proofread, to show your story to family, or just to enjoy what you've built.
+The **Read | Edit** toggle at the top of the sidebar switches the whole app between editing and reading. In Read mode every section (Overview, Stories, Timeline, Gallery, Family Tree, Career, Maps) shows your biography as a finished, read-only site, using the same sidebar. Switch back to Edit at any time and you land on the same section. You can also click **Read My Biography** on the Overview to switch to Read mode. Use it to proofread, to show your story to family, or just to enjoy what you've built.
 
 ## Settings
 
 ### Claude API Key
 To enable AI curation, paste your Anthropic API key here. The key is stored locally on your machine and used only to make AI requests on your behalf. You can get a key from [console.anthropic.com](https://console.anthropic.com).
 
-### Sync with lifescribe.us (optional)
-Connect your lifescribe.us account with a sync token to link your desktop biography with the web:
-
-- **Refresh** — pull the latest content from the web into the app.
-- **Publish** — push local items that haven't been published yet up to the web.
-- **Reset** — replace local synced content with a fresh copy from the web.
-
-Sync has modes that control which side is the source of truth (web-master, app-master, or standalone/offline). If the same item changed in both places, conflicts are listed so you can resolve them deliberately — nothing is silently overwritten.
-
-The app never requires an account. In standalone mode it is a complete, private, offline biography tool.
+The app never requires an account and doesn't connect to any website. It is a complete, private, offline biography tool.
 
 ## Where Your Data Lives
 
 - **Database**: a single SQLite file (`lifescribe.db`) in the app's local data folder.
 - **Photos**: stay exactly where they are on your disk — the app stores their locations, not copies.
 - **Thumbnails**: generated copies cached in the app's data folder.
-- **API key and sync credentials**: stored locally in the app.
+- **API key**: stored locally in the app.
 
-Backing up is simple: keep a copy of the app's data folder and your photo folders.
+Backing up is simple: use **Settings → Back up now** to save a snapshot of the database (the newest 10 are kept), and keep a copy of the app's data folder, including its `images` folder.
 
 ## Tips
 

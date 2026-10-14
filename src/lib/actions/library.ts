@@ -13,7 +13,7 @@ export interface LibraryCopyResult {
 /**
  * One-time migration: photos imported before the image library existed point at the user's
  * original files. Copy each into the library and repoint the row, so the biography no longer
- * breaks when those files are moved or deleted. Photos downloaded by sync already live in
+ * breaks when those files are moved or deleted. Photos brought in from the website earlier already live in
  * the app's data folder and are left alone.
  */
 export async function copyReferencedPhotosIntoLibrary(

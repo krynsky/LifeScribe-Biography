@@ -81,14 +81,10 @@ export async function updateStory(input: UpdateStoryInput): Promise<Story> {
   const patch: Record<string, unknown> = { ...data };
   if (tags) await setTags(appRunner, "stories", id, tags);
   if (data.title !== undefined) {
-    // The slug is the story's address. Only rewrite it while the story is an unpublished draft that
-    // isn't linked to the web, so published links and synced stories keep a stable URL.
+    // The slug is the story's address (links to it use it). Only rewrite it while the story is still a draft,
+    // so links to a published story keep working.
     const current = await getStory(id);
-    const linked = await query<{ n: number }>(
-      "SELECT 1 AS n FROM sync_state WHERE entity_type = 'story' AND local_id = ? AND remote_id IS NOT NULL",
-      [id]
-    );
-    if (current && current.status === "draft" && linked.length === 0) {
+    if (current && current.status === "draft") {
       patch.slug = await uniqueStorySlug(appRunner, data.title, id);
     }
   }

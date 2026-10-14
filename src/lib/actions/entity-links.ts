@@ -5,7 +5,7 @@ export type { EntityLinkKind, EntityLinks } from "../data/entity-links";
 
 export const getEntityLinks = (kind: links.EntityLinkKind, id: number) => links.getEntityLinks(appRunner, kind, id);
 
-/** Replace an entity's linked stories/albums and mark the entity as edited (so sync notices). */
+/** Replace an entity's linked stories/albums and mark the entity as edited. */
 export async function setEntityLinks(kind: links.EntityLinkKind, id: number, value: Partial<links.EntityLinks>): Promise<void> {
   await links.setEntityLinks(appRunner, kind, id, value);
   await appRunner.execute(`UPDATE ${links.ENTITY_LINK_KINDS[kind].table} SET updated_at = datetime('now') WHERE id = ?`, [id]);

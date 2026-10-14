@@ -132,6 +132,6 @@ export async function getStoryLinkIds(storyId: number): Promise<Record<StoryLink
 
 export async function setStoryLinks(storyId: number, kind: StoryLinkKind, ids: number[]): Promise<void> {
   await replaceLinks(appRunner, STORY_LINK_TABLES[kind].table, "story_id", storyId, ids);
-  // A link change counts as an edit to the story (sync, "last edited").
+  // A link change counts as an edit to the story ("last edited").
   await appRunner.execute("UPDATE stories SET updated_at = datetime('now') WHERE id = ?", [storyId]);
 }
