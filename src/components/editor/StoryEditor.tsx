@@ -163,13 +163,15 @@ export default function StoryEditor({
   }
 
   // Links to other parts of the biography open inside the app; web links open in the browser.
-  // While editing, a plain click places the cursor, so links open on Ctrl/Cmd+click instead.
+  // While editing, a plain click only places the cursor, so links open on Ctrl/Cmd+click (or the Open button).
   function handleLinkClick(e: React.MouseEvent) {
     const anchor = (e.target as HTMLElement).closest("a[href]");
-    if (!anchor || (!readOnly && !(e.ctrlKey || e.metaKey))) return;
-    const href = anchor.getAttribute("href") ?? "";
+    if (!anchor) return;
+    // Never let the webview follow the link itself: it would leave the app or open a browser window.
     e.preventDefault();
-    followLink(href, (t) => navigate(t as never)).catch(console.error);
+    if (!readOnly && !(e.ctrlKey || e.metaKey)) return;
+    e.stopPropagation();
+    followLink(anchor.getAttribute("href") ?? "", (t) => navigate(t as never)).catch(console.error);
   }
 
   if (!editor) return null;
@@ -177,7 +179,7 @@ export default function StoryEditor({
   // Read mode: plain prose like the public site — no card frame, scroll area, or word counts.
   if (readOnly) {
     return (
-      <div onClick={handleLinkClick}>
+      <div onClickCapture={handleLinkClick}>
         <EditorContent editor={editor} className="tiptap" />
       </div>
     );
@@ -194,7 +196,7 @@ export default function StoryEditor({
     >
       {!readOnly && <EditorToolbar editor={editor} onImageInsert={() => setPickerOpen(true)} />}
       <div className="flex-1 overflow-y-auto p-6">
-        <div onClick={handleLinkClick}>
+        <div onClickCapture={handleLinkClick}>
           <EditorContent editor={editor} className="tiptap min-h-[400px]" />
         </div>
       </div>
