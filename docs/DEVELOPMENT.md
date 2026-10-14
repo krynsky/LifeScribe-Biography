@@ -62,7 +62,7 @@ src-tauri/                  # Rust backend
   src/lib.rs                # plugin registration + Tauri command handler list
   src/photos.rs             # scan_folder, extract_exif, generate_thumbnail, batch_process_photos
   src/archive.rs            # extract_archive (ZIP extraction)
-  src/db.rs                 # app data directory setup
+  src/data.rs               # data location (default or user-chosen folder), copy/restart commands
   migrations/               # reference SQL schema (see Migrations below)
   tauri.conf.json           # window config, asset protocol scope, SQL plugin preload
   capabilities/             # Tauri permission grants (fs, dialog, http, shell, sql)
@@ -82,7 +82,8 @@ TypeScript owns all business logic, UI state, SQL queries, parsing of archive JS
 Adding a Rust command: implement it in `src-tauri/src/`, register it in the `generate_handler!` list in [lib.rs](../src-tauri/src/lib.rs), and call it from TypeScript with `invoke("command_name", args)`.
 
 ### Database
-- Single SQLite file `lifescribe.db` in the app-local data directory, opened via `tauri-plugin-sql` ([db.ts](../src/lib/db.ts)).
+- Single SQLite file `lifescribe.db`, opened via `tauri-plugin-sql` ([db.ts](../src/lib/db.ts)). By default it lives in the app config folder; if the user picks a data folder (Settings → Data location) it is `<folder>/lifescribe.db`. The choice is stored in `data-location.json` in the app config folder, read by [src-tauri/src/data.rs](../src-tauri/src/data.rs) and exposed to the frontend through [data-location.ts](../src/lib/data-location.ts). Images, imported photos (`media/`), backups and thumbnails all live under the same folder (`dataSubDir()`); never build those paths from `appLocalDataDir()`.
+- Moving the data ([data-move-run.ts](../src/lib/data-move-run.ts)): back up, `VACUUM INTO` the new folder, copy the sub-folders, then rewrite saved file paths and story image URLs **in the copy only** (pure helpers in [data-move.ts](../src/lib/data-move.ts)), write the pointer file, and restart. The old data is never modified or deleted. Add any new column that stores a data-folder file path to `PATH_COLUMNS`.
 - **Migrations are inlined in `src/lib/db.ts`**, tracked in a `_migrations` table by name. The SQL files under [src-tauri/migrations/](../src-tauri/migrations/) are the reference copies; when changing schema, add a new named migration to the runner in `db.ts` (never edit an applied migration).
 - Core tables: `biography` (single row, id=1), `stories`, `milestones`, `albums`, `media`, `family_members` + `family_relationships`, `career_entries`, `map_pins`, plus junction tables and `import_jobs`/`import_items`.
 - All data access goes through `src/lib/actions/*` — pages should not run raw SQL.
@@ -100,7 +101,7 @@ The whole route tree lives in [src/routes/index.tsx](../src/routes/index.tsx). E
 - **Categories and tags** are shared records: `categories` (name, slug, color, icon) with a `category_id` on stories, milestones, career entries, pins and albums; `tags` with `story_tags` / `album_tags`. Logic in [src/lib/data/taxonomy.ts](../src/lib/data/taxonomy.ts); read queries expose `category`, `category_color`, `category_icon` and `tags` via [src/lib/data/select.ts](../src/lib/data/select.ts).
 - **Links** between stories/albums and milestones/pins/career are seven join tables (`story_milestones`, …) managed by [src/lib/data/links.ts](../src/lib/data/links.ts).
 - **Ordering**: `position` columns plus `setOrder` / `moveId` in [src/lib/data/order.ts](../src/lib/data/order.ts).
-- **Images** the user adds are copied into `%LOCALAPPDATA%\com.lifescribe.app\images` ([src/lib/images.ts](../src/lib/images.ts)), named by content hash. Settings has a button to copy older, path-referenced photos in.
+- **Images** the user adds are copied into the data folder's `images` folder (default `%LOCALAPPDATA%\com.lifescribe.app\images`; [src/lib/images.ts](../src/lib/images.ts)), named by content hash. Settings has a button to copy older, path-referenced photos in.
 - **Testing the data layer**: functions take a `SqlRunner` ([src/lib/data/sql.ts](../src/lib/data/sql.ts)); tests use `createTestDb()` from `src/lib/data/test-runner.ts`.
 
 ### Import pipeline

@@ -1,4 +1,4 @@
-import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { dataSubDir } from "../data-location";
 import { execute, query } from "../db";
 import { isInsideLibrary } from "../image-library";
 import { copyIntoLibrary, libraryDir } from "../images";
@@ -19,7 +19,7 @@ export interface LibraryCopyResult {
 export async function copyReferencedPhotosIntoLibrary(
   onProgress?: (done: number, total: number) => void
 ): Promise<LibraryCopyResult> {
-  const [lib, syncDir] = [await libraryDir(), await join(await appLocalDataDir(), "media")];
+  const [lib, syncDir] = [await libraryDir(), await dataSubDir("media")];
   const rows = await query<{ id: number; file_path: string }>(
     "SELECT id, file_path FROM media WHERE file_path IS NOT NULL AND (import_source IS NULL OR import_source <> 'sync')"
   );

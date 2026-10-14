@@ -5,13 +5,20 @@ let _db: Database | null = null;
 let _dbPromise: Promise<Database> | null = null;
 
 import { MIGRATIONS, isBenignMigrationError, splitStatements } from "./migrations";
+import { getDataLocation, unavailableMessage } from "./data-location";
 
-const MIGRATIONS_PATH = "sqlite:lifescribe.db";
+/** The default database is resolved by the SQL plugin; a chosen data folder is an absolute path. */
+async function connectionString(): Promise<string> {
+  const loc = await getDataLocation();
+  if (!loc.available) throw new Error(unavailableMessage(loc));
+  return loc.custom ? `sqlite:${loc.dbPath}` : "sqlite:lifescribe.db";
+}
 
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   if (_dbPromise) return _dbPromise;
-  _dbPromise = Database.load(MIGRATIONS_PATH)
+  _dbPromise = connectionString()
+    .then((path) => Database.load(path))
     .then(async (db) => {
       await runMigrations(db);
       _db = db;

@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useAppVersion } from "@/lib/app-version";
 import {
   BookOpen,
   Clock,
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
 export default function Sidebar() {
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const version = useAppVersion();
   const { mode, setMode } = useViewMode();
 
   function isActive(item: NavItem): boolean {
@@ -166,7 +168,7 @@ export default function Sidebar() {
         className="px-5 py-3 text-xs"
         style={{ color: "var(--color-sidebar-text)", opacity: 0.4 }}
       >
-        v0.1.0
+        {version && `v${version}`}
       </div>
     </aside>
   );

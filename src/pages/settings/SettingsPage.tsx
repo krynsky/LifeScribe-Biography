@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { getVersion } from "@tauri-apps/api/app";
+import { useAppVersion } from "@/lib/app-version";
 import { CheckCircle, ExternalLink } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import { getApiKey, saveApiKey } from "@/lib/ai-curator";
 import { copyReferencedPhotosIntoLibrary } from "@/lib/actions/library";
 import { createBackup } from "@/lib/backup";
+import DataLocationCard from "@/components/settings/DataLocationCard";
 
 export default function SettingsPage() {
   // Photo library migration
@@ -45,11 +46,10 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [apiKeySaved, setApiKeySaved] = useState(false);
 
-  const [version, setVersion] = useState("");
+  const version = useAppVersion();
 
   useEffect(() => {
     setApiKey(getApiKey());
-    getVersion().then(setVersion).catch(() => {});
   }, []);
 
   function handleSaveApiKey(e: React.FormEvent) {
@@ -107,6 +107,8 @@ export default function SettingsPage() {
           </form>
         </div>
 
+        <DataLocationCard />
+
         {/* Backup */}
         <div className="p-6 rounded-xl border" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
           <h2 className="text-base font-semibold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
@@ -160,10 +162,6 @@ export default function SettingsPage() {
             <div className="flex justify-between">
               <dt style={{ color: "var(--color-text-secondary)" }}>Version</dt>
               <dd style={{ color: "var(--color-text)" }}>{version}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt style={{ color: "var(--color-text-secondary)" }}>Data location</dt>
-              <dd className="font-mono text-xs" style={{ color: "var(--color-text)" }}>%LOCALAPPDATA%\LifeScribe\</dd>
             </div>
           </dl>
         </div>

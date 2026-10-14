@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use walkdir::WalkDir;
 
 const SUPPORTED_EXTENSIONS: &[&str] = &[
@@ -67,11 +67,7 @@ fn thumb_path_for(app: &AppHandle, source: &Path) -> Result<PathBuf> {
     hasher.update(source.to_string_lossy().as_bytes());
     let hash = hex::encode(hasher.finalize());
 
-    let thumbs_dir = app
-        .path()
-        .app_local_data_dir()
-        .expect("app local data dir")
-        .join("thumbs");
+    let thumbs_dir = crate::data::files_root(app).join("thumbs");
 
     Ok(thumbs_dir.join(format!("{}.jpg", &hash[..16])))
 }

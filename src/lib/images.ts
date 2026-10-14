@@ -1,11 +1,12 @@
-import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
+import { dataSubDir } from "./data-location";
 import { exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs";
 import { open } from "@tauri-apps/plugin-dialog";
 import { IMAGE_EXTENSIONS, isInsideLibrary, libraryFileName } from "./image-library";
 
 /** Folder holding every image the user has added. Lives in the app data folder. */
 export async function libraryDir(): Promise<string> {
-  const dir = await join(await appLocalDataDir(), "images");
+  const dir = await dataSubDir("images");
   await mkdir(dir, { recursive: true });
   return dir;
 }

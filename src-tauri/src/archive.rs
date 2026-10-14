@@ -1,8 +1,8 @@
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 use zip::ZipArchive;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,11 +20,7 @@ pub async fn extract_archive(
     let archive_file = fs::File::open(&archive_path).map_err(|e| e.to_string())?;
     let mut archive = ZipArchive::new(archive_file).map_err(|e| e.to_string())?;
 
-    let temp_dir = app
-        .path()
-        .app_local_data_dir()
-        .expect("app local data dir")
-        .join("temp");
+    let temp_dir = crate::data::files_root(&app).join("temp");
 
     // Create unique extraction directory from archive name
     let archive_name = Path::new(&archive_path)

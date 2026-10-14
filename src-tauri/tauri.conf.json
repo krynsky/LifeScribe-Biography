@@ -45,9 +45,7 @@
   },
   "plugins": {
     "sql": {
-      "preloadConnections": [
-        "sqlite:lifescribe.db"
-      ]
+      "preloadConnections": []
     }
   }
 }

@@ -1,4 +1,4 @@
-mod db;
+mod data;
 mod photos;
 mod archive;
 
@@ -11,7 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .setup(|app| {
-            db::setup_app_dir(app.handle())?;
+            data::setup(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -22,6 +22,12 @@ pub fn run() {
             photos::batch_process_photos,
             // Archive commands
             archive::extract_archive,
+            // Data location
+            data::get_data_location,
+            data::set_data_location,
+            data::dir_has_database,
+            data::copy_data_folders,
+            data::restart_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

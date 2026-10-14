@@ -1,11 +1,12 @@
-import { appLocalDataDir, join } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
+import { dataSubDir } from "./data-location";
 import { mkdir, readDir, remove } from "@tauri-apps/plugin-fs";
 import { execute } from "./db";
 import { backupFileName, backupsToDelete, sqlStringLiteral } from "./backup-names";
 
 /** Folder holding database backups. */
 export async function backupsDir(): Promise<string> {
-  const dir = await join(await appLocalDataDir(), "backups");
+  const dir = await dataSubDir("backups");
   await mkdir(dir, { recursive: true });
   return dir;
 }
