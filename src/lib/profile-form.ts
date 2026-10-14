@@ -65,3 +65,11 @@ export function profileToColumns(f: ProfileForm) {
 export function isProfileDirty(saved: ProfileForm, current: ProfileForm): boolean {
   return JSON.stringify(profileToColumns(saved)) !== JSON.stringify(profileToColumns(current));
 }
+
+/** The profile's name as written on a story ("First Middle Last, Suffix"); empty when no name is set. */
+export function subjectDisplayName(b: Pick<Biography, "subject_first_name" | "subject_middle_name" | "subject_last_name" | "subject_suffix"> | null | undefined): string {
+  if (!b) return "";
+  const name = [b.subject_first_name, b.subject_middle_name, b.subject_last_name].map((p) => p?.trim()).filter(Boolean).join(" ");
+  const suffix = b.subject_suffix?.trim();
+  return suffix && name ? `${name}, ${suffix}` : name;
+}

@@ -6,6 +6,7 @@ import { AlbumChips } from "@/components/reader/LinkedChips";
 import { TagList } from "@/components/reader/CategoryChip";
 import { getStory } from "@/lib/actions/stories";
 import { getBiography } from "@/lib/actions/biography";
+import { subjectDisplayName } from "@/lib/profile-form";
 import { imageSrc } from "@/lib/image-src";
 import { getRelationsForStory, type StoryRelations } from "@/lib/actions/related";
 import { formatDisplayDate, parseTags } from "@/lib/reader-utils";
@@ -15,6 +16,7 @@ export default function StoryView() {
   const { storyId } = useParams({ from: "/stories/$storyId" });
   const [story, setStory] = useState<Story | null>(null);
   const [siteTitle, setSiteTitle] = useState("");
+  const [byline, setByline] = useState("");
   const [loading, setLoading] = useState(true);
   const [related, setRelated] = useState<StoryRelations | null>(null);
 
@@ -24,6 +26,7 @@ export default function StoryView() {
       .then(([s, b, r]) => {
         setStory(s);
         setSiteTitle(b?.title ?? "");
+        setByline(subjectDisplayName(b));
         setRelated(r);
       })
       .catch(console.error)
@@ -60,12 +63,12 @@ export default function StoryView() {
           {story.title}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {story.author_name && (
+          {byline && (
             <span className="font-medium" style={{ color: "var(--color-text-secondary)" }}>
-              {story.author_name}
+              {byline}
             </span>
           )}
-          {story.author_name && date && <span>·</span>}
+          {byline && date && <span>·</span>}
           {date && (
             <span className="font-medium" style={{ color: "var(--color-primary)" }}>
               {date}

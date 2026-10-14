@@ -156,3 +156,22 @@ describe("0012_drop_web_cover_fields", () => {
     expect(cols("media")).not.toContain("remote_url");
   });
 });
+
+describe("0013_byline_from_profile", () => {
+  it("moves the stories' author name into an empty profile, then drops the column", () => {
+    const db = new Database(":memory:");
+    migrate(db, 12);
+    db.exec("INSERT INTO stories (id, title, author_name) VALUES (1, 'A', 'Mary Ann Smith'), (2, 'B', 'Mary Ann Smith')");
+    migrate(db);
+    expect(db.prepare("SELECT subject_first_name f, subject_last_name l FROM biography WHERE id = 1").get()).toEqual({ f: "Mary Ann", l: "Smith" });
+    expect((db.prepare("PRAGMA table_info(stories)").all() as { name: string }[]).map((c) => c.name)).not.toContain("author_name");
+  });
+
+  it("leaves a profile name that is already set alone", () => {
+    const db = new Database(":memory:");
+    migrate(db, 12);
+    db.exec("UPDATE biography SET subject_first_name = 'Pat' WHERE id = 1; INSERT INTO stories (id, title, author_name) VALUES (1, 'A', 'Mark Krynsky')");
+    migrate(db);
+    expect(db.prepare("SELECT subject_first_name f, subject_last_name l FROM biography WHERE id = 1").get()).toEqual({ f: "Pat", l: null });
+  });
+});

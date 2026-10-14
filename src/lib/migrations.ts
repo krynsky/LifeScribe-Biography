@@ -655,4 +655,17 @@ ALTER TABLE albums DROP COLUMN cover_image;
 ALTER TABLE media DROP COLUMN remote_url
 `,
   ],
+  // A story's byline now comes from the profile name. Carry the one name the stories had over to an empty
+  // profile (last word = last name, the rest = first name), then drop the per-story column.
+  [
+    "0013_byline_from_profile",
+    `
+UPDATE biography SET
+  subject_first_name = (SELECT TRIM(SUBSTR(n, 1, LENGTH(n) - LENGTH(REPLACE(n, RTRIM(n, REPLACE(n, ' ', '')), '')))) FROM (SELECT TRIM(author_name) AS n FROM stories WHERE TRIM(COALESCE(author_name, '')) LIKE '% %' LIMIT 1)),
+  subject_last_name = (SELECT REPLACE(n, RTRIM(n, REPLACE(n, ' ', '')), '') FROM (SELECT TRIM(author_name) AS n FROM stories WHERE TRIM(COALESCE(author_name, '')) LIKE '% %' LIMIT 1))
+WHERE id = 1 AND COALESCE(subject_first_name, '') = '' AND COALESCE(subject_last_name, '') = ''
+  AND EXISTS (SELECT 1 FROM stories WHERE TRIM(COALESCE(author_name, '')) LIKE '% %');
+ALTER TABLE stories DROP COLUMN author_name
+`,
+  ],
 ];

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isProfileDirty, profileToColumns, profileToForm, validateProfile, type ProfileForm } from "./profile-form";
+import { isProfileDirty, profileToColumns, profileToForm, subjectDisplayName, validateProfile, type ProfileForm } from "./profile-form";
 import type { Biography } from "./models";
 
 const form: ProfileForm = {
@@ -51,5 +51,18 @@ describe("profileToForm and isProfileDirty", () => {
     expect(isProfileDirty(form, { ...form, tagline: "   " })).toBe(false);
     expect(isProfileDirty(form, { ...form, tagline: "Hi" })).toBe(true);
     expect(isProfileDirty(form, { ...form, bannerPath: "x.jpg" })).toBe(true);
+  });
+});
+
+describe("subjectDisplayName", () => {
+  const base = { subject_first_name: null, subject_middle_name: null, subject_last_name: null, subject_suffix: null };
+  it("joins the name parts and adds a suffix", () => {
+    expect(subjectDisplayName({ ...base, subject_first_name: "Mark", subject_middle_name: "J", subject_last_name: "Krynsky", subject_suffix: "Jr." })).toBe("Mark J Krynsky, Jr.");
+    expect(subjectDisplayName({ ...base, subject_first_name: " Mark ", subject_last_name: "Krynsky" })).toBe("Mark Krynsky");
+  });
+  it("is empty when no name is set", () => {
+    expect(subjectDisplayName(base)).toBe("");
+    expect(subjectDisplayName({ ...base, subject_suffix: "Jr." })).toBe("");
+    expect(subjectDisplayName(null)).toBe("");
   });
 });

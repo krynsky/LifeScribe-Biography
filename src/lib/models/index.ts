@@ -34,7 +34,6 @@ export interface Story {
   category_icon?: string | null;
   category_id?: number | null;
   tags?: string | null; // JSON array of tag names
-  author_name?: string | null;
   view_count: number;
   created_at: string;
   updated_at: string;
