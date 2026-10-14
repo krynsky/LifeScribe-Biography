@@ -8,7 +8,7 @@
 
 **Tech Stack:** Tauri 2, React 19, TypeScript, `@tauri-apps/plugin-sql` (SQLite), Vitest (new), the lifescribe.us REST API (existing `/sync/pull`, `/sync/push`, `/sync/media`).
 
-**Spec:** `docs/superpowers/specs/2026-06-28-sync-source-of-truth-design.md`
+**Spec:** `docs/archive/specs/2026-06-28-sync-source-of-truth-design.md`
 
 ---
 
