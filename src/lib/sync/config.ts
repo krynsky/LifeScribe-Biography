@@ -3,6 +3,7 @@ import type { SyncMode } from "./types";
 const KEY_TOKEN = "lifescribe_sync_token";
 const KEY_URL = "lifescribe_sync_url";
 const KEY_MODE = "lifescribe_sync_mode";
+const KEY_SITE_SLUG = "lifescribe_site_slug";
 const DEFAULT_API_URL = "https://lifescribe.us/api/v1";
 
 export function getSyncToken(): string {
@@ -11,6 +12,15 @@ export function getSyncToken(): string {
 
 export function getSyncUrl(): string {
   return localStorage.getItem(KEY_URL) ?? DEFAULT_API_URL;
+}
+
+/** The website address slug (lifescribe.us/bio/<slug>), remembered from the last successful connection test. */
+export function getSiteSlug(): string {
+  return localStorage.getItem(KEY_SITE_SLUG) ?? "";
+}
+
+export function setSiteSlug(slug: string): void {
+  localStorage.setItem(KEY_SITE_SLUG, slug);
 }
 
 export function getSyncMode(): SyncMode {

@@ -1,6 +1,8 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useNavigate } from "@tanstack/react-router";
+import { followLink } from "@/lib/internal-links";
 
 // Tiptap core
 import Document from "@tiptap/extension-document";
@@ -119,6 +121,7 @@ export default function StoryEditor({
   placeholder = "Start writing your story…",
   readOnly = false,
 }: StoryEditorProps) {
+  const navigate = useNavigate();
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -159,11 +162,25 @@ export default function StoryEditor({
     editor?.chain().focus().setImage({ src: convertFileSrc(path), alt: path.split(/[\\/]/).pop() }).run();
   }
 
+  // Links to other parts of the biography open inside the app; web links open in the browser.
+  // While editing, a plain click places the cursor, so links open on Ctrl/Cmd+click instead.
+  function handleLinkClick(e: React.MouseEvent) {
+    const anchor = (e.target as HTMLElement).closest("a[href]");
+    if (!anchor || (!readOnly && !(e.ctrlKey || e.metaKey))) return;
+    const href = anchor.getAttribute("href") ?? "";
+    e.preventDefault();
+    followLink(href, (t) => navigate(t as never)).catch(console.error);
+  }
+
   if (!editor) return null;
 
   // Read mode: plain prose like the public site — no card frame, scroll area, or word counts.
   if (readOnly) {
-    return <EditorContent editor={editor} className="tiptap" />;
+    return (
+      <div onClick={handleLinkClick}>
+        <EditorContent editor={editor} className="tiptap" />
+      </div>
+    );
   }
 
   return (
@@ -177,7 +194,9 @@ export default function StoryEditor({
     >
       {!readOnly && <EditorToolbar editor={editor} onImageInsert={() => setPickerOpen(true)} />}
       <div className="flex-1 overflow-y-auto p-6">
-        <EditorContent editor={editor} className="tiptap min-h-[400px]" />
+        <div onClick={handleLinkClick}>
+          <EditorContent editor={editor} className="tiptap min-h-[400px]" />
+        </div>
       </div>
       <MediaPickerModal open={pickerOpen} onClose={() => setPickerOpen(false)} onPick={insertImage} title="Insert an image" />
       <div

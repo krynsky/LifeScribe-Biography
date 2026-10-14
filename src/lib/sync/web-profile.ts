@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import { getSyncToken, getSyncUrl } from "./config";
+import { getSyncToken, getSyncUrl, setSiteSlug } from "./config";
 
 export interface RemoteProfile {
   id: string;
@@ -16,5 +16,6 @@ export async function testConnection(): Promise<RemoteProfile> {
   if (!resp.ok) throw new Error(`API ${resp.status}`);
   const json = (await resp.json()) as { data: RemoteProfile; error?: string };
   if (json.error) throw new Error(json.error);
+  if (json.data?.site?.slug) setSiteSlug(json.data.site.slug);
   return json.data;
 }
