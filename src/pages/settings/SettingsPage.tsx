@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAppVersion } from "@/lib/app-version";
-import { CheckCircle, ExternalLink } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
-import { getApiKey, saveApiKey } from "@/lib/ai-curator";
 import { copyReferencedPhotosIntoLibrary } from "@/lib/actions/library";
 import { createBackup } from "@/lib/backup";
 import DataLocationCard from "@/components/settings/DataLocationCard";
@@ -42,71 +40,13 @@ export default function SettingsPage() {
     }
   }
 
-  // Claude API key
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeySaved, setApiKeySaved] = useState(false);
-
   const version = useAppVersion();
-
-  useEffect(() => {
-    setApiKey(getApiKey());
-  }, []);
-
-  function handleSaveApiKey(e: React.FormEvent) {
-    e.preventDefault();
-    saveApiKey(apiKey.trim());
-    setApiKeySaved(true);
-    setTimeout(() => setApiKeySaved(false), 2000);
-  }
 
   return (
     <div className="p-8 max-w-2xl">
       <PageHeader title="Settings" />
 
       <div className="space-y-6">
-        {/* Claude API Key */}
-        <div className="p-6 rounded-xl border" style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-          <h2 className="text-base font-semibold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
-            AI Curation (Anthropic Claude)
-          </h2>
-          <p className="text-sm mb-4" style={{ color: "var(--color-text-secondary)" }}>
-            Provide your Anthropic API key to enable AI-powered content curation from notes and journal entries.
-            Your key is stored locally on your device only.
-          </p>
-          <form onSubmit={handleSaveApiKey} className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-text)" }}>API Key</label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-ant-…"
-                className="w-full px-3 py-2 rounded-lg border text-sm font-mono"
-                style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium"
-                style={{ background: "var(--color-primary)" }}
-              >
-                {apiKeySaved && <CheckCircle size={14} />}
-                {apiKeySaved ? "Saved!" : "Save API Key"}
-              </button>
-              <a
-                href="https://console.anthropic.com/settings/keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-sm"
-                style={{ color: "var(--color-primary)" }}
-              >
-                Get an API key <ExternalLink size={12} />
-              </a>
-            </div>
-          </form>
-        </div>
-
         <DataLocationCard />
 
         {/* Backup */}

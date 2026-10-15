@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.54.0
-        version: 0.54.0
       '@tanstack/react-router':
         specifier: ^1.120.0
         version: 1.170.15(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -215,10 +212,6 @@ importers:
         version: 4.1.9(@types/node@26.0.1)(vite@6.4.3(@types/node@26.0.1)(jiti@2.7.0)(lightningcss@1.32.0))
 
 packages:
-
-  '@anthropic-ai/sdk@0.54.0':
-    resolution: {integrity: sha512-xyoCtHJnt/qg5GG6IgK+UJEndz8h8ljzt/caKXmq3LfBF81nC/BW6E4x2rOWCZcvsLyVW+e8U5mtIr6UCE/kJw==}
-    hasBin: true
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1959,8 +1952,6 @@ packages:
         optional: true
 
 snapshots:
-
-  '@anthropic-ai/sdk@0.54.0': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:

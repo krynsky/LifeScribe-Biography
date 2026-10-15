@@ -1,15 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowLeft, Star, CheckCircle, XCircle, ChevronDown, ChevronUp,
-  Sparkles, Loader2, Clock, Briefcase, MapPin, BookOpen
+  ArrowLeft, Star, CheckCircle, XCircle,
+  Loader2, Clock, Briefcase, MapPin, BookOpen
 } from "lucide-react";
 import { listImportItems, updateImportItemStatus } from "@/lib/actions/import";
 import { createStory } from "@/lib/actions/stories";
 import { createMilestone } from "@/lib/actions/milestones";
 import { createCareerEntry } from "@/lib/actions/career";
 import { createMapPin } from "@/lib/actions/map-pins";
-import { curateText, getApiKey } from "@/lib/ai-curator";
 import type {
   ImportItem, ImportItemType,
   ImportStoryContent, ImportMilestoneContent,
@@ -142,14 +141,6 @@ export default function ReviewPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [loading, setLoading] = useState(true);
 
-  // Curation pane
-  const [showCurate, setShowCurate] = useState(false);
-  const [rawText, setRawText] = useState("");
-  const [curating, setCurating] = useState(false);
-  const [curateStatus, setCurateStatus] = useState("");
-  const [curateError, setCurateError] = useState("");
-  const hasApiKey = !!getApiKey();
-
   const loadItems = useCallback(async () => {
     const all = await listImportItems({ status: "pending_review" });
     setItems(all);
@@ -172,24 +163,6 @@ export default function ReviewPage() {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
   }
 
-  async function handleCurate() {
-    if (!rawText.trim()) return;
-    setCurating(true);
-    setCurateError("");
-    try {
-      const summary = await curateText(rawText, undefined, setCurateStatus);
-      setRawText("");
-      setShowCurate(false);
-      setCurateStatus("");
-      await loadItems();
-      if (summary.total === 0) setCurateError("No biography content found in that text. Try adding more detail.");
-    } catch (err) {
-      setCurateError(String(err));
-    } finally {
-      setCurating(false);
-    }
-  }
-
   const filtered = filter === "all" ? items : items.filter((i) => i.item_type === filter);
 
   const counts: Partial<Record<ImportItemType, number>> = {};
@@ -210,92 +183,15 @@ export default function ReviewPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-2xl" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
-            Review AI Suggestions
+            Review Imported Items
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
             {items.length > 0
-              ? `${items.length} suggestion${items.length !== 1 ? "s" : ""} waiting for review`
-              : "No pending suggestions"}
+              ? `${items.length} item${items.length !== 1 ? "s" : ""} waiting for review`
+              : "Nothing waiting for review"}
           </p>
         </div>
-
-        <button
-          onClick={() => setShowCurate((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium"
-          style={{ background: "var(--color-primary)" }}
-        >
-          <Sparkles size={14} />
-          Curate with AI
-          {showCurate ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
       </div>
-
-      {/* Curate panel */}
-      {showCurate && (
-        <div
-          className="p-5 rounded-xl border mb-6"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)", boxShadow: "var(--shadow-card)" }}
-        >
-          <div className="text-sm font-medium mb-2" style={{ color: "var(--color-text)" }}>
-            Paste notes, journal entries, or memories
-          </div>
-          <p className="text-xs mb-3" style={{ color: "var(--color-text-muted)" }}>
-            Claude will extract stories, milestones, career entries, and places from your text.
-          </p>
-
-          {!hasApiKey && (
-            <div
-              className="p-3 rounded-lg text-xs mb-3"
-              style={{ background: "var(--color-accent)" + "18", color: "var(--color-accent-dark)" }}
-            >
-              No API key configured.{" "}
-              <button
-                className="underline"
-                onClick={() => navigate({ to: "/settings" })}
-              >
-                Add your Anthropic API key in Settings →
-              </button>
-            </div>
-          )}
-
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            rows={8}
-            placeholder="I was born in 1985 in Chicago. Went to Northwestern for Computer Science. Worked at Accenture from 2007-2010 before joining a startup..."
-            className="w-full px-3 py-2 rounded-lg border text-sm resize-none"
-            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)", color: "var(--color-text)" }}
-          />
-
-          {curateStatus && (
-            <div className="flex items-center gap-2 text-xs mt-2" style={{ color: "var(--color-text-muted)" }}>
-              <Loader2 size={12} className="animate-spin" /> {curateStatus}
-            </div>
-          )}
-          {curateError && (
-            <div className="text-xs mt-2" style={{ color: "var(--color-error)" }}>{curateError}</div>
-          )}
-
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleCurate}
-              disabled={curating || !rawText.trim() || !hasApiKey}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-white font-medium disabled:opacity-50"
-              style={{ background: "var(--color-primary)" }}
-            >
-              {curating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-              {curating ? "Analyzing…" : "Extract Content"}
-            </button>
-            <button
-              onClick={() => { setShowCurate(false); setCurateError(""); }}
-              className="px-4 py-2 rounded-lg text-sm border"
-              style={{ borderColor: "var(--color-border)", color: "var(--color-text)" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Filter tabs */}
       {items.length > 0 && (
@@ -332,10 +228,10 @@ export default function ReviewPage() {
         >
           <Star size={28} className="mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} />
           <div className="font-medium text-sm mb-1" style={{ color: "var(--color-text)" }}>
-            {items.length === 0 ? "No suggestions yet" : "No items match this filter"}
+            {items.length === 0 ? "Nothing to review yet" : "No items match this filter"}
           </div>
           <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Use "Curate with AI" above to extract biography content from your notes.
+            Import a social media archive and its stories, milestones and career entries will show up here for you to accept.
           </div>
         </div>
       ) : (

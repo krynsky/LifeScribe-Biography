@@ -60,8 +60,6 @@ How it works:
 2. In LifeScribe, go to **Import → Archive Import** and select the downloaded ZIP file.
 3. LifeScribe extracts the archive, detects which platform it came from, and parses its contents into suggested biography entries — posts become stories, life events become milestones, work history becomes career entries.
 
-### AI Curation (optional)
-If you add a Claude API key in Settings, LifeScribe can use AI to organize raw imported text into structured suggestions — pulling out story ideas, milestones, career entries, and places from your posts and notes. The AI only extracts what's clearly supported by your content; it never invents details.
 
 ### Review Screen
 Nothing imported is added to your biography automatically. Every suggestion lands in the **Review** screen first, where you can accept, edit, or reject each item — individually or in bulk. Only accepted items become part of your biography.
@@ -72,8 +70,9 @@ The **Read | Edit** toggle at the top of the sidebar switches the whole app betw
 
 ## Settings
 
-### Claude API Key
-To enable AI curation, paste your Anthropic API key here. The key is stored locally on your machine and used only to make AI requests on your behalf. You can get a key from [console.anthropic.com](https://console.anthropic.com).
+- **Data location**: see where your data is stored and move it to another folder.
+- **Back up your data**: save a snapshot of your database.
+- **Photo library**: copy photos imported earlier into the app so they keep working if the originals move.
 
 The app never requires an account and doesn't connect to any website. It is a complete, private, offline biography tool.
 
@@ -82,7 +81,6 @@ The app never requires an account and doesn't connect to any website. It is a co
 - **Database**: a single SQLite file (`lifescribe.db`). By default it is in the app's data folder; see **Settings → Data location** to move everything to a folder of your choice.
 - **Photos**: stay exactly where they are on your disk — the app stores their locations, not copies.
 - **Thumbnails**: generated copies cached in the app's data folder.
-- **API key**: stored locally in the app.
 
 ### Choosing your data folder
 

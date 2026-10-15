@@ -21,8 +21,8 @@ const IMPORT_SOURCES = [
   },
   {
     id: "review",
-    title: "Review Suggestions",
-    description: "Review and accept AI-generated story drafts, milestones, and album suggestions.",
+    title: "Review Imported Items",
+    description: "Review and accept the stories, milestones and career entries found in your imported archives.",
     icon: Star,
     path: "/import/review",
     color: "#7C5CBF",

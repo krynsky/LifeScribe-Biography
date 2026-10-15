@@ -11,7 +11,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.54.0",
     "@tanstack/react-router": "^1.120.0",
     "@tanstack/router-devtools": "^1.120.0",
     "@tauri-apps/api": "^2",

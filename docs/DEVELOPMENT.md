@@ -16,7 +16,6 @@ The original design/plan document is [2026-06-06-001-feat-lifescribe-desktop-app
 | Database | SQLite via `tauri-plugin-sql` |
 | Photo processing | Rust `image` + EXIF crates |
 | Maps | Leaflet |
-| AI | Anthropic SDK (`@anthropic-ai/sdk`), user-supplied API key, `claude-haiku-4-5` |
 | Icons | lucide-react |
 | Tests | Vitest (frontend unit tests) |
 
@@ -53,7 +52,6 @@ src/                        # React frontend
     db.ts                   # SQLite connection singleton + inline migration runner
     actions/                # data-access layer: one module per entity (stories, gallery, ...)
     models/                 # shared TypeScript types
-    ai-curator.ts           # Claude API integration for import curation
     archive-parsers.ts      # Facebook/Instagram/LinkedIn export parsers
   store/                    # Zustand stores
   styles/globals.css        # Tailwind + design tokens
@@ -107,8 +105,7 @@ The whole route tree lives in [src/routes/index.tsx](../src/routes/index.tsx). E
 ### Import pipeline
 1. **Photos**: `PhotoImportPage` → Rust `scan_folder`/`batch_process_photos` → rows in `media` (deduped by `import_hash`).
 2. **Archives**: `ArchiveImportPage` → Rust `extract_archive` → `archive-parsers.ts` detects the platform (Facebook / Instagram / LinkedIn) and parses JSON/CSV into `import_items`.
-3. **AI curation** (optional): `ai-curator.ts` sends raw text to Claude (`claude-haiku-4-5`, user's own API key from localStorage) with a strict JSON-only extraction prompt, producing suggested stories/milestones/career entries/map pins as `import_items`.
-4. **Review**: `ReviewPage` lets the user accept/edit/reject each `import_item`; accepted items are materialized into the real tables.
+3. **Review**: `ReviewPage` lets the user accept/edit/reject each `import_item`; accepted items are materialized into the real tables.
 
 ## Testing
 
@@ -128,7 +125,6 @@ Ported from the LifeScribe web app: primary `#3D7A8A`, accent `#D4A86A`, Merriwe
 
 - Tauri capabilities in `src-tauri/capabilities/` gate fs, dialog, http, shell, and sql access; the http plugin is scoped (e.g., `img.youtube.com` is allowed for video thumbnails). If a network or file call fails with a permission error, the capability files are the first place to look.
 - The asset protocol scope in `tauri.conf.json` controls which disk paths the webview may load images from.
-- The Claude API key is stored in `localStorage`, acceptable for a single-user local app.
 
 ## Release
 
@@ -136,4 +132,4 @@ Ported from the LifeScribe web app: primary `#3D7A8A`, accent `#D4A86A`, Merriwe
 pnpm tauri build
 ```
 
-Bundles are produced per `tauri.conf.json` (`targets: "all"`; Windows installers today — Mac/mobile are planned but deferred). Version is tracked in three places: `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` — bump all of them together.
+Bundles are produced per `tauri.conf.json` (`targets: "all"`; Windows installers today — Mac/mobile are planned but deferred). Version is tracked in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` (the `lifescribe` package) — bump all of them together. The sidebar and Settings read it from the app.
