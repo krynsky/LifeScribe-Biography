@@ -71,22 +71,22 @@ The **Read | Edit** toggle at the top of the sidebar switches the whole app betw
 ## Settings
 
 - **Data location**: see where your data is stored and move it to another folder.
-- **Back up your data**: save a snapshot of your database.
-- **Photo library**: copy photos imported earlier into the app so they keep working if the originals move.
 
 The app never requires an account and doesn't connect to any website. It is a complete, private, offline biography tool.
 
 ## Where Your Data Lives
 
 - **Database**: a single SQLite file (`lifescribe.db`). By default it is in the app's data folder; see **Settings → Data location** to move everything to a folder of your choice.
-- **Photos**: stay exactly where they are on your disk — the app stores their locations, not copies.
+- **Images and photos**: images you add are copied into the data folder's `images` folder, so your biography keeps working if the originals move.
 - **Thumbnails**: generated copies cached in the app's data folder.
 
 ### Choosing your data folder
 
 **Settings → Data location** shows where your data is and lets you pick a different folder, for example on another drive. The app copies your database, images, imported photos and backups there, updates the saved file locations, and switches to the new folder when you restart. Your previous data is left where it was as a safety copy; delete it yourself once you're happy. Avoid cloud-synced folders (OneDrive, Dropbox, Google Drive): syncing a database while the app is using it can corrupt it. If the folder is on a drive that isn't connected when the app starts, the app tells you and asks you to reconnect it.
 
-Backing up is simple: use **Settings → Back up now** to save a snapshot of the database (the newest 10 are kept), and keep a copy of the app's data folder, including its `images` folder.
+### Backing up
+
+Your data folder is your backup. Close LifeScribe, then copy the whole folder (database, `images`, `media` and `backups`) to another drive or storage. Closing the app first makes sure the copy is complete. To restore, put the copy back in the data folder, or point **Settings → Data location → Choose folder…** at it.
 
 ## Tips
 

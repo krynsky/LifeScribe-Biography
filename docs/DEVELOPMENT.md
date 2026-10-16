@@ -99,7 +99,7 @@ The whole route tree lives in [src/routes/index.tsx](../src/routes/index.tsx). E
 - **Categories and tags** are shared records: `categories` (name, slug, color, icon) with a `category_id` on stories, milestones, career entries, pins and albums; `tags` with `story_tags` / `album_tags`. Logic in [src/lib/data/taxonomy.ts](../src/lib/data/taxonomy.ts); read queries expose `category`, `category_color`, `category_icon` and `tags` via [src/lib/data/select.ts](../src/lib/data/select.ts).
 - **Links** between stories/albums and milestones/pins/career are seven join tables (`story_milestones`, …) managed by [src/lib/data/links.ts](../src/lib/data/links.ts).
 - **Ordering**: `position` columns plus `setOrder` / `moveId` in [src/lib/data/order.ts](../src/lib/data/order.ts).
-- **Images** the user adds are copied into the data folder's `images` folder (default `%LOCALAPPDATA%\com.lifescribe.app\images`; [src/lib/images.ts](../src/lib/images.ts)), named by content hash. Settings has a button to copy older, path-referenced photos in.
+- **Images** the user adds are copied into the data folder's `images` folder (default `%LOCALAPPDATA%\com.lifescribe.app\images`; [src/lib/images.ts](../src/lib/images.ts)), named by content hash.
 - **Testing the data layer**: functions take a `SqlRunner` ([src/lib/data/sql.ts](../src/lib/data/sql.ts)); tests use `createTestDb()` from `src/lib/data/test-runner.ts`.
 
 ### Import pipeline

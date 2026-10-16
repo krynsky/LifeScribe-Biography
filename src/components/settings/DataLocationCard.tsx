@@ -96,6 +96,12 @@ export default function DataLocationCard() {
         </dl>
       )}
 
+      <p className="text-sm mb-4 p-3 rounded-lg" style={{ background: "var(--color-surface-2)", color: "var(--color-text-secondary)" }}>
+        <strong style={{ color: "var(--color-text)" }}>Backing up:</strong> close LifeScribe, then copy this whole folder to another
+        drive or storage. Closing the app first makes sure the copy is complete. To restore, put the copy back in this
+        folder (or choose it with <em>Choose folder…</em>).
+      </p>
+
       <div className="flex items-center gap-3">
         <button
           onClick={handleChoose}
