@@ -50,11 +50,6 @@ export default function HomeView() {
         <h1 className="text-4xl font-bold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>
           {bio.title}
         </h1>
-        {bio.tagline && (
-          <p className="mt-3 text-xl" style={{ color: "var(--color-text-secondary)" }}>
-            {bio.tagline}
-          </p>
-        )}
         {bio.bio && (
           <p className="mx-auto mt-5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
             {bio.bio}

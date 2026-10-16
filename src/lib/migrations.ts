@@ -673,4 +673,13 @@ ALTER TABLE stories DROP COLUMN author_name
     "0014_relationship_ended",
     `ALTER TABLE family_relationships ADD COLUMN ended INTEGER NOT NULL DEFAULT 0`,
   ],
+  // The profile's tagline and profile photo came from the website's site settings and aren't used anywhere
+  // in the app any more (the home page shows the title, bio and banner).
+  [
+    "0015_drop_tagline_and_avatar",
+    `
+ALTER TABLE biography DROP COLUMN tagline;
+ALTER TABLE biography DROP COLUMN avatar_photo_path
+`,
+  ],
 ];

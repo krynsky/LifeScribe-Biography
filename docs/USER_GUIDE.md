@@ -13,7 +13,7 @@ Your data is stored locally on your machine. Nothing is uploaded anywhere; the a
 ## Sections of Your Biography
 
 ### Overview
-Your home base. Shows your biography at a glance — title, tagline, cover photo, and a summary of your content.
+Your home base. Shows your biography at a glance — title, bio, banner, and a summary of your content.
 
 ### Stories
 Long-form writing about moments and chapters of your life. The story editor is a full rich-text editor with:

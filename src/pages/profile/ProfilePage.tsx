@@ -60,36 +60,6 @@ export default function ProfilePage() {
       <PageHeader title="Profile" subtitle="How your biography introduces you" />
       <form onSubmit={handleSave} className="max-w-2xl space-y-8">
         <section className="space-y-4">
-          <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>General</h2>
-          <div>
-            <label className={label} style={{ color: "var(--color-text)" }} htmlFor="pf-title">Biography title *</label>
-            <input id="pf-title" value={form.title} onChange={(e) => set({ title: e.target.value })} maxLength={PROFILE_LIMITS.title + 20} className="w-full px-3 py-2 rounded-lg border text-sm" style={field} />
-            {err("title")}
-          </div>
-          <div>
-            <label className={label} style={{ color: "var(--color-text)" }} htmlFor="pf-tagline">Tagline</label>
-            <input id="pf-tagline" value={form.tagline} onChange={(e) => set({ tagline: e.target.value })} placeholder="A short line under your title" className="w-full px-3 py-2 rounded-lg border text-sm" style={field} />
-            <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>{form.tagline.length}/{PROFILE_LIMITS.tagline}</p>
-            {err("tagline")}
-          </div>
-          <div>
-            <label className={label} style={{ color: "var(--color-text)" }} htmlFor="pf-bio">Bio</label>
-            <textarea id="pf-bio" value={form.bio} onChange={(e) => set({ bio: e.target.value })} rows={5} placeholder="A paragraph about you, shown on your home page" className="w-full px-3 py-2 rounded-lg border text-sm resize-y" style={field} />
-            <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>{form.bio.length}/{PROFILE_LIMITS.bio}</p>
-            {err("bio")}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>Photos</h2>
-            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>The banner appears across the top of your home page.</p>
-          </div>
-          <ImagePicker label="Profile photo" shape="circle" allowGallery value={form.avatarPath} onChange={(p) => set({ avatarPath: p })} emptyHint="No photo" />
-          <ImagePicker label="Banner image" allowGallery value={form.bannerPath} onChange={(p) => set({ bannerPath: p })} emptyHint="No banner" />
-        </section>
-
-        <section className="space-y-4">
           <div>
             <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>Subject identity</h2>
             <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
@@ -125,6 +95,29 @@ export default function ProfilePage() {
               {err("subjectSuffix")}
             </div>
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>General</h2>
+          <div>
+            <label className={label} style={{ color: "var(--color-text)" }} htmlFor="pf-title">Biography title *</label>
+            <input id="pf-title" value={form.title} onChange={(e) => set({ title: e.target.value })} maxLength={PROFILE_LIMITS.title + 20} className="w-full px-3 py-2 rounded-lg border text-sm" style={field} />
+            {err("title")}
+          </div>
+          <div>
+            <label className={label} style={{ color: "var(--color-text)" }} htmlFor="pf-bio">Bio</label>
+            <textarea id="pf-bio" value={form.bio} onChange={(e) => set({ bio: e.target.value })} rows={5} placeholder="A paragraph about you, shown on your home page" className="w-full px-3 py-2 rounded-lg border text-sm resize-y" style={field} />
+            <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>{form.bio.length}/{PROFILE_LIMITS.bio}</p>
+            {err("bio")}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}>Banner</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>The banner appears across the top of your home page.</p>
+          </div>
+          <ImagePicker label="Banner image" allowGallery value={form.bannerPath} onChange={(p) => set({ bannerPath: p })} emptyHint="No banner" />
         </section>
 
         <div className="flex items-center gap-4 pt-2 border-t sticky bottom-0 py-4" style={{ borderColor: "var(--color-border)", background: "var(--color-background)" }}>

@@ -185,3 +185,16 @@ describe("0014_relationship_ended", () => {
     expect(db.prepare("SELECT ended FROM family_relationships").get()).toEqual({ ended: 0 });
   });
 });
+
+describe("0015_drop_tagline_and_avatar", () => {
+  it("removes the two unused profile columns and keeps the rest", () => {
+    const db = new Database(":memory:");
+    migrate(db, 14);
+    db.exec("UPDATE biography SET title = 'Mine', tagline = 'hi', avatar_photo_path = 'a.jpg', cover_photo_path = 'b.jpg' WHERE id = 1");
+    migrate(db);
+    const cols = (db.prepare("PRAGMA table_info(biography)").all() as { name: string }[]).map((c) => c.name);
+    expect(cols).not.toContain("tagline");
+    expect(cols).not.toContain("avatar_photo_path");
+    expect(db.prepare("SELECT title, cover_photo_path FROM biography WHERE id = 1").get()).toEqual({ title: "Mine", cover_photo_path: "b.jpg" });
+  });
+});

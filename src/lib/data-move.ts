@@ -12,7 +12,6 @@ export const PATH_COLUMNS: ReadonlyArray<readonly [table: string, column: string
   ["map_pins", "image_path"],
   ["career_entries", "logo_path"],
   ["family_members", "photo_path"],
-  ["biography", "avatar_photo_path"],
   ["biography", "cover_photo_path"],
 ];
 

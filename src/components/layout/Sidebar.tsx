@@ -16,6 +16,7 @@ import {
   Tags,
 } from "lucide-react";
 import { useViewMode } from "@/lib/view-mode";
+import BrandLogo from "./BrandLogo";
 
 interface NavItem {
   label: string;
@@ -60,26 +61,26 @@ export default function Sidebar() {
     >
       {/* App branding */}
       <div
-        className="flex items-center gap-3 px-5 py-5 border-b"
+        className="px-5 py-5 border-b"
         style={{ borderColor: "rgba(255,255,255,0.08)" }}
       >
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-          style={{ background: "var(--color-primary)" }}
-        >
-          L
-        </div>
-        <div>
-          <div
-            className="text-sm font-semibold"
-            style={{ color: "var(--color-sidebar-text-active)", fontFamily: "var(--font-heading)" }}
+        <BrandLogo className="w-full h-auto brightness-0 invert" />
+        {/* Stretched to the logo's full width, whatever the sidebar width is. */}
+        <svg viewBox="0 0 184 36" className="mt-1 w-full h-auto" role="img" aria-label="Biography">
+          <text
+            x="0"
+            y="25"
+            fontSize="27"
+            fontWeight="400"
+            textLength="180"
+            lengthAdjust="spacingAndGlyphs"
+            fill="var(--color-sidebar-text)"
+            fillOpacity="0.6"
+            style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
           >
-            LifeScribe
-          </div>
-          <div className="text-xs" style={{ color: "var(--color-sidebar-text)", opacity: 0.6 }}>
             Biography
-          </div>
-        </div>
+          </text>
+        </svg>
       </div>
 
       {/* Read / Edit toggle */}

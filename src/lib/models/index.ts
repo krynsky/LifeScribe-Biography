@@ -3,12 +3,10 @@
 export interface Biography {
   id: number;
   title: string;
-  tagline: string | null;
   bio: string | null;
   birth_date: string | null;
   birth_place: string | null;
   cover_photo_path: string | null;
-  avatar_photo_path: string | null;
   subject_first_name?: string | null;
   subject_middle_name?: string | null;
   subject_last_name?: string | null;
