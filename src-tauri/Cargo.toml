@@ -1,6 +1,6 @@
 [package]
 name = "lifescribe"
-version = "0.2.4"
+version = "0.2.5"
 description = "LifeScribe — Local-First Biography App"
 authors = ["LifeScribe"]
 license = "MIT"
