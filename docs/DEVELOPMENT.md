@@ -132,4 +132,8 @@ Ported from the LifeScribe web app: primary `#3D7A8A`, accent `#D4A86A`, Merriwe
 pnpm tauri build
 ```
 
-Bundles are produced per `tauri.conf.json` (`targets: "all"`; Windows installers today — Mac/mobile are planned but deferred). Version is tracked in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` (the `lifescribe` package) — bump all of them together. The sidebar and Settings read it from the app.
+Bundles are produced per `tauri.conf.json` (`targets: "all"`; Windows installers here; macOS is built by CI, see below; mobile is not planned). Version is tracked in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` (the `lifescribe` package) — bump all of them together. The sidebar and Settings read it from the app.
+
+### macOS build
+
+macOS bundles can only be built on a Mac, so CI does it: run the **macOS build** workflow (`.github/workflows/macos-build.yml`) from the repository's Actions tab. It builds a **universal** `.dmg` (Apple Silicon and Intel) and keeps it as a workflow artifact; enter a release tag (for example `v0.2.5`) to also attach it to that release. [`src-tauri/tauri.macos.conf.json`](../src-tauri/tauri.macos.conf.json) makes Mac builds produce a `.dmg`, sets the minimum macOS version (11), opens the window at 1280 x 800, and ad-hoc signs the app (`signingIdentity: "-"`). The build is **not** notarized, so macOS shows a Gatekeeper warning on first launch (see the README).

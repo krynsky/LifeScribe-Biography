@@ -16,10 +16,10 @@ A local desktop app for writing and preserving your life story. Capture your sto
 - 📖 **Read mode** — flip the whole app into a finished, read-only view of your biography to proofread or share
 - 📥 **Fill it fast** — import a folder of photos, or your Facebook, Instagram, or LinkedIn history, and review what it finds
 
-**Platform:** Windows (x64); macOS (universal, unsigned) builds come from a GitHub Actions workflow
+**Platform:** Windows (x64); macOS (universal — Apple Silicon and Intel, unsigned) builds come from a GitHub Actions workflow
 **Status:** Active development
 
-> The macOS build is not code-signed or notarized (no Apple Developer account). macOS will warn "Apple could not verify this app" the first time you open it — right-click the app and choose **Open** to bypass this, once. No macOS release has been published yet.
+> The macOS build is not code-signed or notarized (no Apple Developer account), so macOS will warn "Apple could not verify this app" the first time you open it. On macOS 15 (Sequoia) or later, open **System Settings → Privacy & Security** and click **Open Anyway** next to LifeScribe; on earlier versions, right-click the app and choose **Open**. You only need to do this once. No macOS release has been published yet.
 
 **[⬇ Download the latest release](https://github.com/krynsky/LifeScribe-Biography/releases/latest)** — Windows (x64) installers (`.exe` and `.msi`).
 

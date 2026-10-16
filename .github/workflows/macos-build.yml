@@ -1,0 +1,64 @@
+name: macOS build
+
+# Builds the macOS .dmg (a universal build that runs on Apple Silicon and Intel Macs).
+# Run it by hand from the Actions tab. To attach the .dmg to an existing release, enter its tag (for example v0.2.4);
+# leave the tag empty to just build and download the file as a workflow artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the .dmg to (leave empty to only build)"
+        required: false
+        default: ""
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the universal .dmg
+        run: pnpm tauri build --target universal-apple-darwin
+
+      - name: Find the .dmg
+        id: dmg
+        run: |
+          DMG=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+          echo "Built: $DMG"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: ${{ steps.dmg.outputs.path }}
+          if-no-files-found: error
+
+      - name: Attach the .dmg to the release
+        if: ${{ inputs.tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" "${{ steps.dmg.outputs.path }}" --clobber

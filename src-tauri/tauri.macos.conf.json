@@ -1,0 +1,25 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LifeScribe",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["dmg"],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}
