@@ -65,15 +65,15 @@ export default function Sidebar() {
         style={{ borderColor: "rgba(255,255,255,0.08)" }}
       >
         <BrandLogo className="w-full h-auto brightness-0 invert" />
-        {/* Stretched to the logo's full width, whatever the sidebar width is. */}
+        {/* Natural letter shapes (never stretched), spaced out to sit just inside the logo's width. */}
         <svg viewBox="0 0 184 36" className="mt-1 w-full h-auto" role="img" aria-label="Biography">
           <text
             x="0"
-            y="25"
-            fontSize="27"
+            y="26"
+            fontSize="32"
             fontWeight="400"
-            textLength="180"
-            lengthAdjust="spacingAndGlyphs"
+            textLength="158"
+            lengthAdjust="spacing"
             fill="var(--color-sidebar-text)"
             fillOpacity="0.6"
             style={{ fontFamily: "var(--font-body, Inter, sans-serif)" }}
