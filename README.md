@@ -1,6 +1,7 @@
 # LifeScribe Biography
 
 [![Latest Release](https://img.shields.io/github/v/release/krynsky/LifeScribe-Biography)](https://github.com/krynsky/LifeScribe-Biography/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/Windows-x64-0078D6?logo=windows&logoColor=white)](docs/DEVELOPMENT.md#release)
 [![macOS](https://img.shields.io/badge/macOS-universal%2C%20unsigned-000000?logo=apple&logoColor=white)](docs/DEVELOPMENT.md#release)
 [![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
@@ -24,6 +25,8 @@ A local desktop app for writing and preserving your life story. Capture your sto
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="150">](https://www.buymeacoffee.com/krynsky)
 
+![LifeScribe Biography in Read mode — the Overview page with the sidebar, banner, section counts, and recent stories](docs/screenshots/overview.png)
+
 ---
 
 ## Table of Contents
@@ -35,6 +38,7 @@ A local desktop app for writing and preserving your life story. Capture your sto
 - [Development](#development)
 - [Releasing](#releasing)
 - [Documentation](#documentation)
+- [License](#license)
 
 ---
 
@@ -198,3 +202,9 @@ docs/                      # user guide, developer guide, release notes, archive
 - `2026-06-06-001-feat-lifescribe-desktop-app-plan.md` — the original desktop app plan
 
 Historical documents describe what was decided at the time. Some describe systems since removed — website sync is the big one. Read them for *why*; where they disagree with `docs/DEVELOPMENT.md` or the code, they are out of date.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for the full text.
