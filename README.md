@@ -19,6 +19,8 @@ A local desktop app for writing and preserving your life story. Capture your sto
 **Platform:** Windows (x64) and macOS (universal — Apple Silicon and Intel, unsigned)
 **Status:** Active development
 
+> The Windows installers are not code-signed (no code-signing certificate), so Windows SmartScreen may show **"Windows protected your PC"** and list the publisher as unknown the first time you run one. Click **More info**, then **Run anyway**. Your browser or antivirus may also warn about the download for the same reason.
+
 > The macOS build is not code-signed or notarized (no Apple Developer account), so macOS will warn "Apple could not verify this app" the first time you open it. On macOS 15 (Sequoia) or later, open **System Settings → Privacy & Security** and click **Open Anyway** next to LifeScribe; on earlier versions, right-click the app and choose **Open**. You only need to do this once.
 
 **[⬇ Download the latest release](https://github.com/krynsky/LifeScribe-Biography/releases/latest)** — Windows (x64) installers (`.exe` and `.msi`) and a universal macOS `.dmg`.
