@@ -27,7 +27,7 @@ A local desktop app for writing and preserving your life story. Capture your sto
 
 [<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="150">](https://www.buymeacoffee.com/krynsky)
 
-![LifeScribe Biography in Read mode — the Overview page with the sidebar, banner, section counts, and recent stories](docs/screenshots/overview.png)
+![LifeScribe Biography in Read mode — the Overview page with the sidebar, banner, title, and section counts](docs/screenshots/overview.png)
 
 ---
 
